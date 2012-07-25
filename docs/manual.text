@@ -1,0 +1,45 @@
+manual.text
+
+ Created on: 2 Feb 2012
+     Author: SooKee oasookee@googlemail.com
+
+     
+------------------------------------------------------------
+| COMPILING:
+------------------------------------------------------------
+
+Skivvy requires C++11 functionality. He is currently built
+using GCC 4.7 trunk but GCC 4.6 may work.
+
+------------------------------------------------------------
+| INSTALLING:
+------------------------------------------------------------
+
+------------------------------------------------------------
+| CONFIGURING:
+------------------------------------------------------------
+
+Skivvy needs a config file to run. By default Skivvy looks
+for the file $HOME/.skivvy/skivvy.conf
+
+The vital settings are:
+
+# The IRC network host to connect to
+server_host: irc.quakenet.org
+server_port: 6667
+
+# Various nicks (in case already in use)
+nick: Skivvy
+nick: Skavvy
+nick: Skevvy
+
+# You will also need some plugins
+plugin: skivvy-plugin-chanops.so
+plugin: skivvy-plugin-diction.so
+plugin: skivvy-plugin-grabber.so
+plugin: skivvy-plugin-rquotes.so
+
+# A list of channels to join
+join: #channel1
+join: #channel2
+join: #channel3
