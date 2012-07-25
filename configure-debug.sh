@@ -4,7 +4,7 @@ GCC_HOME=${HOME}/app/gcc-4.7.0
 
 top_dir=$(pwd)
 
-SKIVVY_INCLUDES="-I../skivvy/src/include"
+SKIVVY_INCLUDES="-I../../../skivvy/src/include/"
 
 DBG_FLAGS="-D DEBUG"
 DBG_FLAGS="$DBG_FLAGS -D _GLIBCXX_DEBUG"

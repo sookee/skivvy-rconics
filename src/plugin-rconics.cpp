@@ -28,7 +28,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 '-----------------------------------------------------------------*/
 
-#include <skivvy/plugin-rconics.h>
+#include <skivvy-rconics/plugin-rconics.h>
 
 #include <iomanip>
 #include <array>

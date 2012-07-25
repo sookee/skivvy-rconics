@@ -21,7 +21,7 @@
 # 
 # '-----------------------------------------------------------------*/
 
-AC_INIT([skivvy],[0.1],[oasookee@gmail.com],[skivvy])
+AC_INIT([skivvy-rconics],[0.1],[oasookee@gmail.com],[skivvy-rconics])
 AC_CONFIG_SRCDIR([src/plugin-rconics.cpp])
 AC_CONFIG_HEADERS([config.h])
 
