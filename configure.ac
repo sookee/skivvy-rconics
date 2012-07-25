@@ -1,5 +1,5 @@
 # /*-----------------------------------------------------------------.
-# | Copyright (C) 2011 SooKee oasookee@gmail.com               |
+# | Copyright (C) 2012 SooKee oasookee@gmail.com               |
 # '------------------------------------------------------------------'
 # 
 # This program is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 # '-----------------------------------------------------------------*/
 
 AC_INIT([skivvy],[0.1],[oasookee@gmail.com],[skivvy])
-AC_CONFIG_SRCDIR([src/test.cpp])
+AC_CONFIG_SRCDIR([src/plugin-rconics.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 AM_INIT_AUTOMAKE([1.10 foreign])

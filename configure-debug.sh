@@ -4,6 +4,8 @@ GCC_HOME=${HOME}/app/gcc-4.7.0
 
 top_dir=$(pwd)
 
+SKIVVY_INCLUDES="-I../skivvy/src/include"
+
 DBG_FLAGS="-D DEBUG"
 DBG_FLAGS="$DBG_FLAGS -D _GLIBCXX_DEBUG"
 DBG_FLAGS="$DBG_FLAGS -D _GLIBCXX_DEBUG_PEDANTIC"
@@ -13,7 +15,7 @@ DBG_FLAGS="$DBG_FLAGS -g3"
 DBG_FLAGS="$DBG_FLAGS -O0"
 
 export CXX="${GCC_HOME}/bin/g++"
-export CXXFLAGS="$DBG_FLAGS -std=gnu++11"
+export CXXFLAGS="$SKIVVY_INCLUDES $DBG_FLAGS -std=gnu++11"
 
 mkdir -p $top_dir/build
 cd $top_dir/build
