@@ -60,7 +60,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 namespace skivvy { namespace ircbot {
 
 IRC_BOT_PLUGIN(RConicsIrcBotPlugin);
-PLUGIN_INFO("OA rcon utils", "0.1");
+PLUGIN_INFO("OA rcon utils", "0.2");
 
 using namespace skivvy;
 using namespace skivvy::irc;
@@ -70,6 +70,7 @@ using namespace skivvy::string;
 
 namespace tr1 = std::tr1;
 
+const str K_ADMIN = "rconics.admin";
 const str WHOIS_USER = "rconics.whois.user";
 const str RCON_USER = "rconics.user";
 const str RCON_SERVER = "rconics.server";
@@ -1037,71 +1038,6 @@ str RConicsIrcBotPlugin::var_sub(const str& s, const str& server)
 	return ret;
 }
 
-//bool RConicsIrcBotPlugin::autoban_check(const str& server, const str& line, const str& data, str& test)
-//{
-//	typedef std::map<str_pair, bool> data_cache;
-//	typedef std::pair<const str_pair, bool> data_cache_pair;
-//	typedef data_cache::iterator data_cache_itr;
-//	typedef data_cache::const_iterator data_cache_citr;
-//
-//	typedef std::pair<str, str> time_pair;
-//	typedef std::map<str, time_pair> time_cache;
-//	typedef time_cache::iterator time_cache_itr;
-//	typedef time_cache::const_iterator time_cache_citr;
-//
-//	static time_cache tc; // line -> {begin, end} time of rule
-//	static data_cache dc; // (line, data} -> result
-//	static time_t cache_cleared = 0;
-//
-//	str srv;
-//	std::istringstream iss(line);
-//	iss >> srv;
-//	if(srv != server)
-//		return false;
-//
-//	if(cache_cleared < bot.get_config_load_time())
-//	{
-//		dc.clear();
-//		cache_cleared = std::time(0);
-//	}
-//
-//	time_cache_itr tci = time_cache.find(line);
-//	if(tci == time_cache.end())
-//	{
-//		// need to cache line in time_cache
-//		time_pair tp;
-//		std::getline(iss, skip, '{');
-//		std::getline(iss, tp.first, ',');
-//		std::getline(iss, tp.second, '}');
-//
-//		if(!iss)
-//			return false;
-//
-//		trim(tp.first);
-//		trim(tp.second);
-//		tci = time_cache.insert(time_cache.begin(), std::make_pair(line, tp));
-//	}
-//
-//	time_t t = std::time(0);
-//	str now = std::ctime(&t); // now = "Www Mmm dd hh:mm:ss yyyy"
-//	if(now.size() < 17)
-//		return false;
-//	now = now.substr(11, 5);
-//
-//	if(now < tci->second.first || now > tci->second.second)
-//		return false;
-//
-//	// rule still in force
-//	str_pair dp = std::make_pair(line, data);
-//	data_cache_itr dci = dc.find(dp);
-//	if(dci != sc.end())
-//		return dci->second; // cached result
-//
-//	// result needs calculating/caching
-//	dc[dp] = autoban_check()
-//	return true;
-//}
-
 bool autoban_check(const str& server, const str& line, str& test)
 {
 	// goo {04:00,10:00} "ban text"
@@ -1155,12 +1091,13 @@ void RConicsIrcBotPlugin::regular_poll()
 
 	if(do_automsg && polltime(poll::RCONMSG, 60))
 	{
-		bug_var(do_automsg);
 		lock_guard lock(automsgs_mtx);
 		bug_var(automsgs.size());
 		for(automsg& amsg: automsgs)
 		{
 			if(!amsg.active)
+				continue;
+			if(!do_automsg_for.count(amsg.server))
 				continue;
 			if(!sm.count(amsg.server))
 			{
@@ -1187,9 +1124,13 @@ void RConicsIrcBotPlugin::regular_poll()
 				amsg.when = std::time(0);
 
 				// Echo to all subscribing channels
-				lock_guard lock(automsg_subs_mtx);
-				for(const message& msg: automsg_subs[amsg.server])
-					bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
+				if(automsg_subs.count(amsg.server))
+				{
+					lock_guard lock(automsg_subs_mtx);
+					if(automsg_subs.count(amsg.server))
+						for(const message& msg: automsg_subs[amsg.server])
+							bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
+				}
 			}
 		}
 	}
@@ -2067,36 +2008,76 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 	return true;
 }
 
+str_vec arg_split(const str& params)
+{
+	str_vec v;
+	std::istringstream iss(params);
+	for(str s; ios::getstring(iss, s); v.push_back(s));
+	return v;
+}
+
 bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 {
 	BUG_COMMAND(msg);
 
-	//std::istringstream iss(msg.get_user_params());
+	static const str prompt = IRC_BOLD + IRC_COLOR + IRC_Brown + "rcon_msg"
+		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
-	str cmd, server;
-	if(!bot.extract_params(msg, {&server, &cmd}))
-		return false;
+
+	// (on|off)
+	// <server> (on|off)
+	// <server> echo (on|off)
+	// <server> turn <num>? (on|off)
+	// <server> add ...
+	// <server> del ...
+	// <server> list
+	//
+
+	{
+		str_vec args = arg_split(msg.get_user_params());
+
+		if(args.empty())
+			return bot.cmd_error(msg, prompt + "No parameters.");
+
+		if(args.size() == 1)
+		{
+			if(!is_user_valid(msg, K_ADMIN))
+				return bot.cmd_error(msg, prompt + msg.get_sender() + " is not admin.");
+
+			if(args[0] == "on")
+				do_automsg = true;
+			else if(args[0] == "off")
+				do_automsg = true;
+			else
+				return bot.cmd_error(msg, prompt + "Expected on|off.");
+		}
+	}
+
+	std::istringstream iss(msg.get_user_params());
+
+	str server;
+	iss >> server;
+	bug_var(server);
 
 	if(!rcon_user_valid(msg.from, server))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised for " + server + ".");
+		return bot.cmd_error(msg, prompt + msg.get_sender() + " is not authorised for " + server + ".");
 
-	bug("cmd: " << cmd);
+
+	str cmd;
+	iss >> cmd;
+	bug_var(cmd);
 
 	if(cmd == "add") // !oarconmsg add google chat 1h "Wibble Wobble Woo"
 	{
 		automsg amsg;
-		str repeat;
-		if(!bot.extract_params(msg, {&amsg.server, &cmd, &amsg.method, &repeat, &amsg.text}))
-			return false;
 
-		bug("cmd        : " << cmd);
+		if(!ios::getstring(iss >> amsg.method >> amsg.repeat >> std::ws, amsg.text))
+			return bot.cmd_error(msg, prompt + "Expected: add <chat|cp> <repeat> \"<message>\"");
+
 		bug("amsg.name  : " << amsg.server);
 		bug("amsg.method: " << amsg.method);
-		bug("repeat     : " << repeat);
+		bug("repeat     : " << amsg.repeat);
 		bug("amsg.text  : " << amsg.text);
-
-		if(!(std::istringstream(repeat) >> amsg.repeat))
-			return bot.cmd_error(msg, help(msg.get_user_cmd()));
 
 		std::time(&amsg.when);
 		amsg.owner = msg;
@@ -2110,17 +2091,13 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	}
 	else if(cmd == "del" || cmd == "delete")
 	{
-		str p;
-		if(!bot.extract_params(msg, {&server, &cmd, &p}))
-			return false;
-		bug("p: " << p);
 		siz pos;
-		if(!(std::istringstream(p) >> pos))
-			return bot.cmd_error(msg, "Expected number, found " + p + ".");
-
+		if(!(iss >> pos))
+			return bot.cmd_error(msg, prompt + "Expected line number to delete.");
 		bug("pos: " << pos);
+
 		if(!(pos < automsgs.size()))
-			return bot.cmd_error(msg, "Number " + p + " out of range.");
+			return bot.cmd_error(msg, prompt + "Number " + std::to_string(pos) + " out of range.");
 
 		{
 			lock_guard lock(automsgs_mtx);
@@ -2152,125 +2129,94 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	}
 	else if(cmd == "echo")
 	{
-		// !rconmsg <server> echo (on|off) [#<n>]
+		// !rconmsg <server> echo (on|off)
 		str state; // on | off
-		str p; // #0-n (optional)
-		if(!bot.extract_params(msg, {&server, &cmd, &state, &p}, false)
-		&& !bot.extract_params(msg, {&server, &cmd, &state}, true))
-			return false;
+		iss >> state;
 		state = lowercase(state);
 		bug("state: " << state);
-
-		if(!p.empty() && (p.size() < 2 || p[0] != '#'))
-			return bot.cmd_error(msg, "expected index (eg. #2)");
-
-		siz pos = 0;
-		if(!p.empty() && (!std::istringstream(p.substr(1)) >> pos))
-			return bot.cmd_error(msg, "expected number after # (eg. #2)");
-
-		bug("pos: " << pos);
 
 		if(state == "on")
 		{
 			lock_guard lock(automsg_subs_mtx);
 			if(automsg_subs[server].count(msg))
-				bot.fc_reply(msg, "Auto messages for " + server + " are already being echoed to this channel.");
+				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
 			else
 			{
 				automsg_subs[server].insert(msg);
-				bot.fc_reply(msg, "Auto messages for " + server + " will now be echoed to this channel.");
+				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will now be echoed to this channel.");
 			}
 		}
 		else if(state == "off")
 		{
 			lock_guard lock(automsg_subs_mtx);
-			if(automsg_subs[server].count(msg))
-				bot.fc_reply(msg, "Auto messages for " + server + " were not being echoed to this channel.");
+			if(!automsg_subs[server].count(msg))
+				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
 			else
 			{
 				automsg_subs[server].erase(msg);
-				bot.fc_reply(msg, "Auto messages for " + server + " will no longer be echoed to this channel.");
+				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will no longer be echoed to this channel.");
 			}
 		}
 		else
 		{
-			return bot.cmd_error(msg, "expected \"on\" or \"off\".");
+			return bot.cmd_error(msg, prompt + "Error: on|off expected.");
 		}
 	}
-	else if(cmd == "on")
+	else if(cmd == "turn")
 	{
-		str p; // #0-n (optional)
-		bot.extract_params(msg, {&server, &cmd, &p}, false);
+		// !rconmsg <server> turn <num>? (on|off)
+		siz pos = 0; // 0 -> all (1-n) -> ordinal
+		if(!(iss >> pos))
+			iss.clear();
+		bug_var(pos);
 
-		if(!p.empty() && (p.size() < 2 || p[0] != '#'))
-			return bot.cmd_error(msg, "expected index (eg. #2)");
+		str state; // on | off
+		iss >> state;
+		state = lowercase(state);
+		bug("state: " << state);
 
-		siz pos = 0;
-		if(!p.empty() && (!std::istringstream(p.substr(1)) >> pos))
-			return bot.cmd_error(msg, "expected number after # (eg. #2)");
+		if(state != "on" && state != "off")
+			return bot.cmd_error(msg, prompt + "Error: on|off expected.");
 
 		lock_guard lock(automsgs_mtx);
 		for(siz i = 0; i < automsgs.size(); ++i)
 		{
 			if(automsgs[i].server == server)
 			{
-				if(p.empty())
+				if(!pos) // do all
 				{
 					if(!automsgs[i].active)
 						automsgs[i].when = std::time(0) - rand_int(0, automsgs[i].repeat);
-					automsgs[i].active = true;
-					do_automsg = true;
+					automsgs[i].active = (state == "on");
 				}
 				else if(!pos--)
 				{
 					if(!automsgs[i].active)
 						automsgs[i].when = std::time(0) - rand_int(0, automsgs[i].repeat);
-					automsgs[i].active = true;
-					do_automsg = true;
+					automsgs[i].active = (state == "on");
 					bot.fc_reply(msg, msg.get_user_cmd() + ": "
 						+ "Message " + std::to_string(i)
 						+ " on " + server + " turned on.");
 					break;
 				}
+				if(state == "on")
+					do_automsg_for.insert(server);
+				else if(state == "off")
+					do_automsg_for.erase(server);
 			}
 		}
-		if(do_automsg)
-			bot.fc_reply(msg, "Sending messages has been turned on.");
+	}
+	else if(cmd == "on")
+	{
+		// !rconmsg <server> (on|off)
+		do_automsg_for.insert(server);
+		bot.fc_reply(msg, prompt + "Sending messages has been turned on for " + server + ".");
 	}
 	else if(cmd == "off")
 	{
-		str p; // #0-n (optional)
-		bot.extract_params(msg, {&server, &cmd, &p}, false);
-
-		if(!p.empty() && (p.size() < 2 || p[0] != '#'))
-			return bot.cmd_error(msg, "expected index (eg. #2)");
-
-		siz pos = 0;
-		if(!p.empty() && (!std::istringstream(p.substr(1)) >> pos))
-			return bot.cmd_error(msg, "expected number after # (eg. #2)");
-
-		lock_guard lock(automsgs_mtx);
-		for(siz i = 0; i < automsgs.size(); ++i)
-		{
-			if(automsgs[i].server == server)
-			{
-				if(p.empty())
-				{
-					automsgs[i].active = false;
-					do_automsg = false;
-				}
-				else if(!pos--)
-				{
-					automsgs[i].active = false;
-					bot.fc_reply(msg, msg.get_user_cmd() + ": "
-						+ "Message " + std::to_string(i)
-						+ " on " + server + " turned off.");
-					break;
-				}
-			}
-		}
-		if(!do_automsg)
-			bot.fc_reply(msg, "Sending messages has been turned off.");
+		// !rconmsg <server> (on|off)
+		do_automsg_for.erase(server);
+		bot.fc_reply(msg, prompt + "Sending messages has been turned off for " + server + ".");
 	}
 	else
 	{

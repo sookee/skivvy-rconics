@@ -154,6 +154,7 @@ private:
 	typedef std::map<str, message_set> message_set_map;
 
 	bool do_automsg = true;
+	str_set do_automsg_for; // server
 	message_set_map automsg_subs; // automsg subscriptions
 	std::mutex automsg_subs_mtx;
 
