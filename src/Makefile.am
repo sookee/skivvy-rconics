@@ -39,12 +39,18 @@ GEN_FLAGS = -Wl,-E -Wfatal-errors -Wall -Wextra -Winit-self -ansi -pedantic -pip
 	
 AM_CXXFLAGS = $(GEN_FLAGS) $(DEF_FLAGS) -std=gnu++11
 
-BOTLIBS = -lskivvy -ldl
+BOTLIBS = $(top_srcdir)/lib/libskivvy.a -ldl
 # -Wl,-E is required for programs that load plugin's
 BOTFLAGS = -Wl,-E
 
 plugin_LTLIBRARIES =  \
 	skivvy-plugin-rconics.la
+
+noinst_PROGRAMS = \
+	test
+	
+test_SOURCES = test.cpp
+test_LDADD = $(top_builddir)/src/.libs/skivvy-plugin-rconics.a $(BOTLIBS)
 
 # IrcBot plugins
 skivvy_plugin_rconics_la_SOURCES = plugin-rconics.cpp rcon.cpp

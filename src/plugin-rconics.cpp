@@ -53,7 +53,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/ircbot.h>
 #include <skivvy/logrep.h>
 #include <skivvy/network.h>
-#include <skivvy/rcon.h>
+#include <skivvy-rconics/rcon.h>
 
 #include <skivvy/socketstream.h>
 
@@ -2071,10 +2071,12 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	{
 		automsg amsg;
 
+		amsg.server = server;
+
 		if(!ios::getstring(iss >> amsg.method >> amsg.repeat >> std::ws, amsg.text))
 			return bot.cmd_error(msg, prompt + "Expected: add <chat|cp> <repeat> \"<message>\"");
 
-		bug("amsg.name  : " << amsg.server);
+		bug("amsg.server: " << amsg.server);
 		bug("amsg.method: " << amsg.method);
 		bug("repeat     : " << amsg.repeat);
 		bug("amsg.text  : " << amsg.text);
@@ -2188,6 +2190,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					if(!automsgs[i].active)
 						automsgs[i].when = std::time(0) - rand_int(0, automsgs[i].repeat);
 					automsgs[i].active = (state == "on");
+					write_automsgs();
 				}
 				else if(!pos--)
 				{
@@ -2197,6 +2200,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					bot.fc_reply(msg, msg.get_user_cmd() + ": "
 						+ "Message " + std::to_string(i)
 						+ " on " + server + " turned on.");
+					write_automsgs();
 					break;
 				}
 				if(state == "on")
@@ -2489,9 +2493,26 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 	return true;
 }
 
+bool RConicsIrcBotPlugin::alert(const message& msg)
+{
+
+}
+
 bool RConicsIrcBotPlugin::initialize()
 {
 	read_automsgs();
+	add
+	({
+		"!alert"
+		, "!alert <server> <expression> [<repeat>]"
+		  "\n  !alert <server> [not] empty"
+		  "\n  !alert <server> [not] full"
+		  "\n  !alert <server> [not] >[=] <n>"
+		  "\n  !alert <server> [not] <[=] <n>"
+		  "\n  !alert <server> [not] = <n>"
+		  "\n  !alert <server> <GUID|IP|name>"
+		, [&](const message& msg){ alert(msg); }
+	});
 	add
 	({
 		"!notes"

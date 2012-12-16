@@ -33,10 +33,50 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 #include <skivvy/ircbot.h>
 
+#include <ctime>
+
 // RPC
 #include <skivvy/plugin-oastats.h>
 
 namespace skivvy { namespace ircbot {
+
+struct automsg
+{
+	bool active = false;
+	message owner;
+	str server; // server name
+	str method; // say | chat | cp
+	delay repeat; // delay in seconds
+	str text;
+	time_t when; // last trigger
+
+	automsg(): when(0) {}
+
+	friend std::ostream& operator<<(std::ostream& os, const automsg& amsg)
+	{
+		os << amsg.active << '\n';
+		os << amsg.owner << '\n';
+		os << amsg.server << '\n';
+		os << amsg.method<< '\n';
+		os << amsg.repeat<< '\n';
+		os << amsg.text;
+
+		return os;
+	}
+
+	friend std::istream& operator>>(std::istream& is, automsg& amsg)
+	{
+		is >> amsg.active >> std::ws;
+		is >> amsg.owner >> std::ws;
+		is >> amsg.server >> std::ws;
+		is >> amsg.method >> std::ws;
+		is >> amsg.repeat >> std::ws;
+		std::getline(is, amsg.text);
+		amsg.when = 0;
+
+		return is;
+	}
+};
 
 /**
  *
@@ -94,42 +134,6 @@ private:
 
 	rcon_user_map& get_rcon_user_map();
 	rcon_server_map& get_rcon_server_map();
-
-	struct automsg
-	{
-		bool active = false;
-		message owner;
-		str server; // server name
-		str method; // say | chat | cp
-		delay repeat; // delay in seconds
-		str text;
-		time_t when; // last trigger
-
-		automsg(): when(0) {}
-
-		friend std::ostream& operator<<(std::ostream& os, const automsg& amsg)
-		{
-			os << amsg.owner << '\n';
-			os << amsg.server << '\n';
-			os << amsg.method<< '\n';
-			os << amsg.repeat<< '\n';
-			os << amsg.text;
-
-			return os;
-		}
-		friend std::istream& operator>>(std::istream& is, automsg& amsg)
-		{
-			is >> amsg.owner >> std::ws;
-			is >> amsg.server >> std::ws;
-			is >> amsg.method >> std::ws;
-			is >> amsg.repeat >> std::ws;
-			std::getline(is, amsg.text);
-			amsg.when = 0;
-
-			return is;
-		}
-	};
-
 
 	RandomTimer automsg_timer;
 
@@ -284,6 +288,7 @@ private:
 	bool rename(const message& msg);
 	bool reteam(const message& msg);
 	bool adminkill(const message& msg);
+	bool alert(const message& msg);
 
 public:
 	RConicsIrcBotPlugin(IrcBot& bot);
