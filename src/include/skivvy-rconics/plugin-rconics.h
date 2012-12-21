@@ -86,6 +86,9 @@ class RConicsIrcBotPlugin
 //, public IrcBotRPCService
 {
 private:
+
+	std::mutex rconlog_mtx;
+
 	enum class poll
 	{
 		RCONMSG

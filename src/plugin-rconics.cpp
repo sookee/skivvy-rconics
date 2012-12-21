@@ -105,6 +105,9 @@ const str ISPMAP_FILE_DEFAULT = "rconics-ispmap.txt";
 
 const str SEARCH_ENGINE_ISP = "rconics.engine.isp";
 
+const str RCON_LOG_FILE = "rconics.log.file";
+const str RCON_LOG_FILE_DEFAULT = "rconics-rcon.log";
+
 
 // alias: GUID, name
 // ip: GUID, IP
@@ -273,6 +276,12 @@ bool RConicsIrcBotPlugin::do_checked_rcon(const message& msg, const str& cmd, st
 		return false;
 	}
 
+	{
+		lock_guard lock(rconlog_mtx);
+		std::ofstream ofs(bot.getf(RCON_LOG_FILE, RCON_LOG_FILE_DEFAULT), std::ios::app);
+		//ofs << msg << '\n';
+		ofs << get_stamp() << " " << msg.to << " " << msg.from << " " << cmd << '\n';
+	}
 	res = do_rcon(msg, cmd, s->second);
 
 	return true;
@@ -1278,7 +1287,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				continue;
 
 			parsed = true;
-			log("LISTPLAYERS: " << p.num << ' ' << p.guid << ' ' << p.name);
+			//log("LISTPLAYERS: " << p.num << ' ' << p.guid << ' ' << p.name);
 			if(trim(p.guid).empty())
 				continue;
 
@@ -1365,7 +1374,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			str name; // can be empty, if so keep name from !listplayers
 			std::getline(iss, name);
-			log("STATUS     : " << p.num << ' ' << p.ping << ' ' << ip << ' '<< name);
+			//log("STATUS     : " << p.num << ' ' << p.ping << ' ' << ip << ' '<< name);
 			if(!name.empty() && name != "^7")
 				p.name = name;
 
@@ -2495,7 +2504,7 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 
 bool RConicsIrcBotPlugin::alert(const message& msg)
 {
-
+	return true;
 }
 
 bool RConicsIrcBotPlugin::initialize()
