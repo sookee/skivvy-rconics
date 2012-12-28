@@ -195,7 +195,8 @@ bool RConicsIrcBotPlugin::rcon_user_valid(const str& user, const str& server)
 		return false;
 
 	for(const str& s: u->second)
-		if(user.find(s) != str::npos)
+		if(bot.preg_match(user, s))
+//		if(user.find(s) != str::npos)
 			return true;
 
 	return false;
@@ -247,7 +248,7 @@ str RConicsIrcBotPlugin::do_rcon(const message& msg, str cmd, const str& host, s
 	else if(!cmd.find("cp"))
 		cmd +=  " - " + bot_name;
 	else if(!cmd.find("!ban") || !cmd.find("!adjust") || !cmd.find("!kick"))
-		cmd += " - " + msg.get_sender();
+		cmd += " - " + msg.get_nick();
 
 	oss << "rcon " << pass << " " << cmd;
 	net::rcon(oss.str(), res, host, port);
@@ -261,18 +262,18 @@ bool RConicsIrcBotPlugin::do_checked_rcon(const message& msg, const str& cmd, st
 	if(!bot.extract_params(msg, {&server}))
 		return false;
 
-	if(!rcon_user_valid(msg.from, server))
-	{
-		bot.fc_reply(msg, msg.get_sender() + " is not authorised for server " + server + ".");
-		return false;
-	}
-
 	rcon_server_map& sm = get_rcon_server_map();
 
 	rcon_server_map::iterator s;
 	if((s = sm.find(server)) == sm.end())
 	{
 		bot.fc_reply(msg, "There is no server named " + server);
+		return false;
+	}
+
+	if(!rcon_user_valid(msg.from, server))
+	{
+		bot.fc_reply(msg, msg.get_nick() + " is not authorised for server " + server + ".");
 		return false;
 	}
 
@@ -379,7 +380,7 @@ bool RConicsIrcBotPlugin::showbans(const message& msg)
 	return true;
 }
 
-void RConicsIrcBotPlugin::rcon(const message& msg)
+bool RConicsIrcBotPlugin::rcon(const message& msg)
 {
 	BUG_COMMAND(msg);
 
@@ -388,7 +389,7 @@ void RConicsIrcBotPlugin::rcon(const message& msg)
 
 	str res;
 	if(!do_checked_rcon(msg, trim(cmd), res))
-		return;
+		return false;
 
 	str line;
 	std::istringstream iss(trim(res));
@@ -397,6 +398,7 @@ void RConicsIrcBotPlugin::rcon(const message& msg)
 		bug("line: " << line);
 		bot.fc_reply(msg, line);
 	}
+	return true;
 }
 
 void RConicsIrcBotPlugin::read_automsgs()
@@ -1093,7 +1095,7 @@ bool autounban_check(const str& server, const str& line, str& ban)
 
 void RConicsIrcBotPlugin::regular_poll()
 {
-	bug_func();
+	//bug_func();
 
 	std::ostringstream oss;
 	const rcon_server_map& sm = get_rcon_server_map();
@@ -1101,7 +1103,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	if(do_automsg && polltime(poll::RCONMSG, 60))
 	{
 		lock_guard lock(automsgs_mtx);
-		bug_var(automsgs.size());
+		//bug_var(automsgs.size());
 		for(automsg& amsg: automsgs)
 		{
 			if(!amsg.active)
@@ -1117,9 +1119,9 @@ void RConicsIrcBotPlugin::regular_poll()
 			if(!amsg.when)
 				amsg.when = std::time(0) - rand_int(0, amsg.repeat);
 
-			bug_var(amsg.when);
-			bug_var(amsg.repeat);
-			bug_var(delay(std::time(0) - amsg.when));
+			//bug_var(amsg.when);
+			//bug_var(amsg.repeat);
+			//bug_var(delay(std::time(0) - amsg.when));
 			if(amsg.repeat < delay(std::time(0) - amsg.when))
 			{
 				oss.str("");
@@ -1129,7 +1131,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				str ret;
 				if(!text.empty())
 					ret = rcon(text, sm.at(amsg.server));
-				bug_var(ret);
+				//bug_var(ret);
 				amsg.when = std::time(0);
 
 				// Echo to all subscribing channels
@@ -1149,7 +1151,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	// every ival minutes
 	if(!do_stats.empty() && polltime(poll::STATS, ival * 60) && bot.has_plugin("OA Stats Reporter"))
 	{
-		bug("Have OA Stats Reporter");
+		//bug("Have OA Stats Reporter");
 		for(const str& server: do_stats)
 		{
 			log("\tserver: " << server);
@@ -1197,7 +1199,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const message& msg: stats_subs)
 					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
 
-				bug("STATS ANNOUNCE: " << oss.str());
+				//bug("STATS ANNOUNCE: " << oss.str());
 				v.erase(v.begin() + i);
 			}
 		}
@@ -1205,7 +1207,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 	//return;
 
-	bug("== GET INTEL ==");
+//	/bug("== GET INTEL ==");
 
 	struct dbent
 	{
@@ -1233,7 +1235,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	str_vec managed = bot.get_vec(RCON_MANAGED);
 	for(const str& server: managed)
 	{
-		log("server: " << server);
+//		log("server: " << server);
 
 //		if((s = sm.find(server)) == sm.cend())
 		if(!sm.count(server))
@@ -1363,9 +1365,9 @@ void RConicsIrcBotPlugin::regular_poll()
 				log("IP PARSE ERROR: " << prev_line[0]);
 				log("IP PARSE ERROR: " << prev_line[1]);
 				log("IP PARSE ERROR: " << line);
-				bug("==================================================");
-				bug(res);
-				bug("==================================================");
+//				bug("==================================================");
+//				bug(res);
+//				bug("==================================================");
 				continue;
 			}
 
@@ -1537,7 +1539,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				oss.str("");
 				oss << "!rename " << p.num << ' ' << renames[server][p.name];
 				str ret = rcon(oss.str(), sm.at(server));
-				bug_var(ret);
+//				bug_var(ret);
 				for(const message& msg: renames_subs[server])
 				{
 					std::istringstream iss(trim(ret));
@@ -1585,23 +1587,23 @@ void RConicsIrcBotPlugin::regular_poll()
 			const dbent e(p.guid, ip, p.name);
 			if(!db_record.count(e))
 			{
-				bug("DB_CACHE: inserting: " << e.guid << ", " << e.ip << ", " << e.name);
+//				bug("DB_CACHE: inserting: " << e.guid << ", " << e.ip << ", " << e.name);
 				db_cache.insert(e);
 				db_record.insert(e);
 			}
 		}
 
-		bug_var(write_db);
+//		bug_var(write_db);
 		if(write_db && polltime(poll::DB_WRITE, 5 * 60) && !db_cache.empty())
 		{
 			for(const dbent& e: db_cache)
 			{
-				bug("ADD TO DB: " << e.guid);
+//				bug("ADD TO DB: " << e.guid);
 				write_to_db("ip", e.guid, e.ip, DB_SORT::MOST_RECENT);
 				write_to_db("name", e.guid, e.name, DB_SORT::MOST_POPULAR);
 			}
 			db_cache.clear();
-			bug_var(db_record.size());
+//			bug_var(db_record.size());
 		}
 	}
 }
@@ -1654,7 +1656,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
 	if(!is_user_valid(msg, WHOIS_USER))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised to use whois database.");
+		return bot.cmd_error(msg, msg.get_nick() + " is not authorised to use whois database.");
 
 	bool exact = false;
 	bool add_loc = false;
@@ -1741,6 +1743,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	}
 
 	{
+		// match on name
 		lock_guard lock(db_mtx);
 		ifs.open("data/rconics-db-name.txt");
 		siz count = 0;
@@ -1809,13 +1812,9 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 					{
 						oss << sep << ent->data;
 						if(add_loc)
-						{
 							oss << " {loc: " << get_loc(ent->data, add_loc_type) << "}";
-						}
 						if(add_isp)
-						{
 							oss << " {isp: " << get_isp(ent->data) << "}";
-						}
 						sep = " ";
 					}
 					oss << "]";
@@ -1829,9 +1828,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 					{
 						oss << sep << get_loc(ent->data, add_loc_type);
 						if(add_isp)
-						{
 							oss << " {isp: " << get_isp(ent->data) << "}";
-						}
 						sep = " ";
 					}
 					oss << "]";
@@ -1845,9 +1842,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 					{
 						oss << sep << get_isp(ent->data);
 						if(add_loc)
-						{
 							oss << " {loc: " << get_loc(ent->data, add_loc_type) << "}";
-						}
 						sep = " ";
 					}
 					oss << "]";
@@ -1872,7 +1867,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
 	if(!is_user_valid(msg, WHOIS_USER))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised to use the whois database.");
+		return bot.cmd_error(msg, msg.get_nick() + " is not authorised to use the whois database.");
 
 	// !notes <GUID> (add <text> | mod <n> <text> | del <n> | list)
 
@@ -2051,7 +2046,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		if(args.size() == 1)
 		{
 			if(!is_user_valid(msg, K_ADMIN))
-				return bot.cmd_error(msg, prompt + msg.get_sender() + " is not admin.");
+				return bot.cmd_error(msg, prompt + msg.get_nick() + " is not admin.");
 
 			if(args[0] == "on")
 				do_automsg = true;
@@ -2069,7 +2064,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	bug_var(server);
 
 	if(!rcon_user_valid(msg.from, server))
-		return bot.cmd_error(msg, prompt + msg.get_sender() + " is not authorised for " + server + ".");
+		return bot.cmd_error(msg, prompt + msg.get_nick() + " is not authorised for " + server + ".");
 
 
 	str cmd;
@@ -2273,7 +2268,7 @@ bool RConicsIrcBotPlugin::rename(const message& msg)
 		return false;
 
 	if(!rcon_user_valid(msg.from, server))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised for " + server + ".");
+		return bot.cmd_error(msg, msg.get_nick() + " is not authorised for " + server + ".");
 
 	lock_guard lock1(renames_mtx);
 	renames[server][from] = to;
@@ -2290,7 +2285,7 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 		return false;
 
 	if(!rcon_user_valid(msg.from, server))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised for " + server + ".");
+		return bot.cmd_error(msg, msg.get_nick() + " is not authorised for " + server + ".");
 
 	rcon_server_map& sm = get_rcon_server_map();
 	rcon_server_map::iterator s;
@@ -2353,8 +2348,9 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 bool RConicsIrcBotPlugin::is_user_valid(const message& msg, const str& svar)
 {
-	for(const str& s: bot.get_vec(svar))
-		if(msg.from.find(s) != str::npos)
+	for(const str& r: bot.get_vec(svar))
+//		if(msg.from.find(s) != str::npos)
+		if(bot.preg_match(msg.from, r))
 			return true;
 	return false;
 }
@@ -2366,7 +2362,7 @@ bool RConicsIrcBotPlugin::adminkill(const message& msg)
 
 	if(!is_user_valid(msg, RCON_ADMINKILL_USERS))
 	{
-		bot.fc_reply(msg, prompt + msg.get_sender() + " is not authorised to use the adminkill feature.");
+		bot.fc_reply(msg, prompt + msg.get_nick() + " is not authorised to use the adminkill feature.");
 		return false;
 	}
 
@@ -2465,7 +2461,7 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 	if(!(iss >> server))
 		return bot.cmd_error(msg, "Expected server name.");
 	if(!rcon_user_valid(msg.from, server))
-		return bot.cmd_error(msg, msg.get_sender() + " is not authorised for " + server + ".");
+		return bot.cmd_error(msg, msg.get_nick() + " is not authorised for " + server + ".");
 
 	str cmd;
 	if(!(iss >> cmd))
@@ -2504,6 +2500,122 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 
 bool RConicsIrcBotPlugin::alert(const message& msg)
 {
+	// !alert <server> <expression> [<repeat>]"
+	// !alert <server> [not] empty"
+	// !alert <server> [not] full"
+	// !alert <server> [not] >[=] <n>"
+	// !alert <server> [not] <[=] <n>"
+	// !alert <server> [not] = <n>"
+	// !alert <server> <GUID|IP|name>"
+
+//	str server;
+//	std::istringstream iss(msg.get_user_params());
+//	str e;
+//	bool n = false;
+//
+//	while(iss >> e)
+//	{
+//		if(!n && e == "not")
+//			n = true;
+//		else if(e == "empty")
+//			;
+//		else if(e = "full")
+//			;
+//	}
+
+	return true;
+}
+
+struct rcon_script
+{
+	str name;
+	str_vec lines;
+
+	friend std::ostream& operator<<(std::ostream& os, const rcon_script& rs)
+	{
+		os << rs.name << '\n';
+		for(const str& line: rs.lines)
+			os << line << '\n';
+		return os << "end";
+	}
+
+	friend std::istream& operator>>(std::istream& is, rcon_script& rs)
+	{
+		is >> rs.name;
+		str line;
+		rs.lines.clear();
+		while(std::getline(is, line) && line != "end")
+			rs.lines.push_back(line);
+		return is;
+	}
+};
+
+bool RConicsIrcBotPlugin::rcon_short(const message& msg)
+{
+	BUG_COMMAND(msg);
+
+//	---> bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
+//	-----------------------------------------------------
+//	                 from: SooKee!~SooKee@SooKee.users.quakenet.org
+//	                  cmd: PRIVMSG
+//	               params: #skivvy
+//	                   to: #skivvy
+//	                 text: !listplayers zim
+//	msg.from_channel()   : true
+//	msg.get_sender()     : SooKee
+//	msg.get_user_cmd()   : !listplayers
+//	msg.get_user_params(): zim
+//	msg.reply_to()       : #skivvy
+//	-----------------------------------------------------
+//	<--- bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
+
+
+
+
+	str server, params;
+	std::getline(std::istringstream(msg.get_user_params()) >> server, params);
+
+	message m = msg;
+	m.text = "!rcon " + server + " " + msg.get_user_cmd() + " " + params;
+//	m.text = "!rcon " + msg.get_user_params() + " " + msg.get_user_cmd();
+	return rcon(m);
+}
+
+bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
+{
+	// execute rcon script
+	BUG_COMMAND(msg);
+
+	str name;
+	str_vec params;
+
+	std::istringstream iss(msg.get_user_params());
+	if(!(iss >> name))
+		return bot.cmd_error(msg, "Expected script name.", false);
+
+	str param;
+	while(iss >> param)
+		params.push_back(param);
+
+	// load scipt
+	str file = bot.getf("rconics.scripts.dir", "rconics-scripts") + "/" + name + "rs";
+
+	std::ifstream ifs(file);
+	if(!ifs)
+		return bot.cmd_error(msg, "Script not found: " + name, false);
+
+	rcon_script script;
+	if(!(ifs >> script))
+		return bot.cmd_error(msg, "Script corrupt: " + name, false);
+
+	// run lines
+	str res;
+	for(const str& line: script.lines)
+		if(!do_checked_rcon(msg, line, res))
+			break;
+
+	bot.fc_reply(msg, "Script " + name + " complete.");
+
 	return true;
 }
 
@@ -2567,9 +2679,45 @@ bool RConicsIrcBotPlugin::initialize()
 	});
 	add
 	({
+		"!listplayers"
+		, "!listplayers <server>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!listplayers"); }
+	});
+	add
+	({
+		"!listadmins"
+		, "!listadmins <server>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!listadmins"); }
+	});
+	add
+	({
+		"!namelog"
+		, "!namelog <server>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+	});
+	add
+	({
+		"!ban"
+		, "!ban <server> <client#>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+	});
+	add
+	({
+		"!kick"
+		, "!kick <server> <client#>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+	});
+	add
+	({
+		"!warn"
+		, "!warn <server> <client#>."
+		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+	});
+	add
+	({
 		"!showbans"
 		, "!showbans <server> Show bans on the given server."
-		, [&](const message& msg){ showbans(msg); }
+		, [&](const message& msg){ rcon_short(msg); }
 	});
 	add
 	({
@@ -2594,10 +2742,9 @@ bool RConicsIrcBotPlugin::initialize()
 	});
 	add
 	({
-		"!adminkill"
-		, "!adminkill <guid>."
-		, [&](const message& msg){ adminkill(msg); }
-		, action::INVISIBLE
+		"!rcon_exec"
+		, "!rcon_exec <script name>."
+		, [&](const message& msg){ rcon_exec(msg); }
 	});
 	automsg_timer.set_maxdelay(10);
 	automsg_timer.set_mindelay(10);

@@ -108,7 +108,7 @@ private:
 //		bug_var(secs_so_far);
 		if(secs < secs_so_far)
 		{
-			bug("POLLING");
+			//bug("POLLING");
 			polls[p] = time(0);
 			return true;
 		}
@@ -283,7 +283,7 @@ private:
 	bool do_checked_rcon(const message& msg, const str& cmd, str& res);
 
 	bool showbans(const message& msg);
-	void rcon(const message& msg);
+	bool rcon(const message& msg);
 	bool rconmsg(const message& msg);
 	bool rcon_stats(const message& msg);
 	bool whois(const message& msg);
@@ -292,6 +292,9 @@ private:
 	bool reteam(const message& msg);
 	bool adminkill(const message& msg);
 	bool alert(const message& msg);
+
+	bool rcon_short(const message& msg);//, const str& cmd);
+	bool rcon_exec(const message& msg);
 
 public:
 	RConicsIrcBotPlugin(IrcBot& bot);

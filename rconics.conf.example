@@ -1,0 +1,84 @@
+# /*-----------------------------------------------------------------.
+# | Copyright (C) 2012 SooKee oaskivvy@gmail.com                     |
+# '------------------------------------------------------------------'
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+# 
+# http://www.gnu.org/licenses/gpl-2.0.html
+# 
+# '-----------------------------------------------------------------*/
+
+# Example Config for Skivvy plugin names rconics
+# Rename this file to rconics.conf
+
+rconics.admin: ~SooKee@SooKee.users.quakenet.org // admin rconics plugin
+
+#rconics.server: <server> <host>[:<port>] <pass>
+#rconics.user: <server> <host substr>
+#rconics.managed: <server>
+#rconics.autoban.guid: <server> <guid>
+#rconics.autounban.guid: <server> <guid>
+
+rconics.bot_name: ^1S^2ki^3v^5vy // what the bot signs its messages with
+rconics.cache.loc.keep: 1w
+rconics.cache.isp.keep: 1w
+rconics.server.down.retry: 1h
+
+## goo ##
+
+rconics.server: goo <server ip>:<port> <rconpassword>
+rconics.managed: goo // rconics tracks players
+rconics.user: goo ~SooKee@SooKee.users.quakenet.org // user may use !rcon on this server
+rconics.user: goo <another user>
+
+// outright immediate bans (no unban protection)
+#rconics.autoban.guid: goo 8B714F00
+
+// Protection for R@nger
+#rconics.autounban.guid: goo 2D00A301 // R@nger
+#rconics.autounban.ip: goo 213.249 // R@nger
+#rconics.autounban.name: goo ^4R^5@^4nger^7 // R@nger
+
+// auto ban player between times {} matching IP range (starts with)
+#rconics.autoban.ip: goo {00:00,23:59} 212.7
+
+# AutoBan by location during specific times
+#rconics.autoban.loc: goo {04:00,09:00} "Kingston upon Hull"
+
+//AutoBan by ISP (substring match)
+#rconics.autoban.isp: goo {00:00,23:59} Kcom
+#rconics.autoban.isp: goo {00:00,23:59} Ovh
+#rconics.autoban.isp: goo {00:00,23:59} TalkTalk
+#rconics.autoban.isp: goo {03:00,10:00} Fastweb
+
+#rconics.autoban.name: goo {00:00,23:59} ^0UnnamedPlayer^7
+
+# whois
+
+// users allowed to access the !whois command
+rconics.whois.user: ~SooKee@SooKee.users.quakenet.org
+rconics.whois.user: <another user>
+
+rconics.automsg_file: rconics-automsgs.txt
+rconics.stats_interval: 5
+
+# reteam
+rconics.reteam.duration: 5m
+
+#  rconics adminkill
+rconics.adminkill.user: ~SooKee@SooKee.users.quakenet.org
+rconics.adminkill.pass: IvuVVQxxSjwkot1Zsg_q37owpEWnUge2 // emergency admin password
+
