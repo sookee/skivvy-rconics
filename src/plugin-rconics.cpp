@@ -70,9 +70,19 @@ using namespace skivvy::string;
 
 namespace tr1 = std::tr1;
 
+
+// rconics.user: <user>
+// rconics.user.name: <user> <name>
+// rconics.user.pass: <user> <pass>
+// rconics.user.preg: <user> <regex>
+
 const str K_ADMIN = "rconics.admin";
+const str USER = "rconics.user";
+const str USER_NAME = "rconics.user.name";
+const str USER_PASS = "rconics.user.pass";
+const str USER_PREG = "rconics.user.preg";
 const str WHOIS_USER = "rconics.whois.user";
-const str RCON_USER = "rconics.user";
+const str RCON_USER = "rconics.rcon.user";
 const str RCON_SERVER = "rconics.server";
 const str RCON_STATS_FILE = "rconics.stats_file";
 const str RCON_STATS_FILE_DEFAULT = "rconics-stats.txt";
@@ -163,6 +173,37 @@ RConicsIrcBotPlugin::rcon_server_map& RConicsIrcBotPlugin::get_rcon_server_map()
 	}
 	return sm;
 }
+
+RConicsIrcBotPlugin::usermap& RConicsIrcBotPlugin::get_rcon_users()
+{
+	// rconics.user: <user>
+	// rconics.user.name: <user> <name>
+	// rconics.user.pass: <user> <pass>
+	// rconics.user.preg: <user> <regex>
+	static usermap um;
+	static time_t config_load_time = bot.get_config_load_time();
+	str k, v;
+	if(config_load_time < bot.get_config_load_time())
+		um.clear();
+	if(um.empty())
+		for(const str& user: bot.get_vec(USER))
+		{
+			rc_user rcu;
+			str u, d;
+			for(const str& name: bot.get_vec(USER_NAME))
+				if(std::getline(std::istringstream(name) >> u >> std::ws, d) && user == u)
+					rcu.name = d;
+			for(const str& pass: bot.get_vec(USER_PASS))
+				if(std::getline(std::istringstream(pass) >> u >> std::ws, d) && user == u)
+					rcu.pass = d;
+			for(const str& preg: bot.get_vec(USER_PREG))
+				if(std::getline(std::istringstream(preg) >> u >> std::ws, d) && user == u)
+					rcu.pregs.push_back(d);
+			um[user] = rcu;
+		}
+	return um;
+}
+
 
 RConicsIrcBotPlugin::rcon_user_map& RConicsIrcBotPlugin::get_rcon_user_map()
 {
@@ -2348,9 +2389,10 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 bool RConicsIrcBotPlugin::is_user_valid(const message& msg, const str& svar)
 {
+	bug_func();
 	for(const str& r: bot.get_vec(svar))
 //		if(msg.from.find(s) != str::npos)
-		if(bot.preg_match(msg.from, r))
+		if(bot.preg_match(msg.get_userhost(), r))
 			return true;
 	return false;
 }

@@ -120,6 +120,20 @@ private:
 		return polltime(p, bot.get(var, dflt));
 	}
 
+	// rconics.user: <user>
+	// rconics.user.name: <user> <name>
+	// rconics.user.pass: <user> <pass>
+	// rconics.user.preg: <user> <regex>
+
+	struct rc_user
+	{
+		str name;
+		str pass;
+		str_vec pregs;
+	};
+
+	typedef std::map<str, rc_user> usermap;
+
 	struct rcon_server
 	{
 		str host;
@@ -134,6 +148,8 @@ private:
 	typedef std::pair<const str, rcon_server> rcon_server_pair;
 	typedef rcon_server_map::iterator server_map_iter;
 	typedef rcon_server_map::const_iterator rcon_server_map_citer;
+
+	usermap& get_rcon_users();
 
 	rcon_user_map& get_rcon_user_map();
 	rcon_server_map& get_rcon_server_map();
