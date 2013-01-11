@@ -236,8 +236,7 @@ bool RConicsIrcBotPlugin::rcon_user_valid(const str& user, const str& server)
 		return false;
 
 	for(const str& s: u->second)
-		if(bot.preg_match(user, s))
-//		if(user.find(s) != str::npos)
+		if(bot.preg_match(s, user))
 			return true;
 
 	return false;
@@ -1293,7 +1292,7 @@ void RConicsIrcBotPlugin::regular_poll()
 		str res = rcon("!namelog", sm.at(server));
 
 		if(trim(res).empty())
-			log("No response from rcon !namelog.");
+			log("No response from rcon !namelog on server: " << server);
 		else
 			log_namelog(res);
 
@@ -1306,7 +1305,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 		if(trim(res).empty())
 		{
-			log("No response from rcon !listplayers.");
+			log("No response from rcon !listplayers on server: " << server);
 			continue;
 		}
 
@@ -1348,7 +1347,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				res = rcon("!ban " + std::to_string(p.num) + " AUTOBAN", sm.at(server));
 				log("RESULT: " << res);
 				if(trim(res).empty())
-					log("No response from rcon status.");
+					log("No response from rcon status on server: " << server);
 			}
 		}
 
@@ -1362,7 +1361,7 @@ void RConicsIrcBotPlugin::regular_poll()
 		res = rcon("status", sm.at(server));
 		if(trim(res).empty())
 		{
-			log("No response from rcon status.");
+			log("No response from rcon status on server: " << server);
 			continue;
 		}
 
@@ -2391,8 +2390,7 @@ bool RConicsIrcBotPlugin::is_user_valid(const message& msg, const str& svar)
 {
 	bug_func();
 	for(const str& r: bot.get_vec(svar))
-//		if(msg.from.find(s) != str::npos)
-		if(bot.preg_match(msg.get_userhost(), r))
+		if(bot.preg_match(r, msg.get_userhost()))
 			return true;
 	return false;
 }
@@ -2540,7 +2538,7 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 	return true;
 }
 
-bool RConicsIrcBotPlugin::alert(const message& msg)
+bool RConicsIrcBotPlugin::alert(const message& /*msg*/)
 {
 	// !alert <server> <expression> [<repeat>]"
 	// !alert <server> [not] empty"
@@ -2663,6 +2661,12 @@ bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
 
 bool RConicsIrcBotPlugin::initialize()
 {
+	if(!bot.has_plugin("OA Stats Reporter", "0.1"))
+	{
+		log(get_name() << " requires OA Stats Reporter plugin.");
+		return false;
+	}
+
 	read_automsgs();
 	add
 	({
@@ -2737,24 +2741,24 @@ bool RConicsIrcBotPlugin::initialize()
 		, "!namelog <server>."
 		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
 	});
-	add
-	({
-		"!ban"
-		, "!ban <server> <client#>."
-		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
-	});
-	add
-	({
-		"!kick"
-		, "!kick <server> <client#>."
-		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
-	});
-	add
-	({
-		"!warn"
-		, "!warn <server> <client#>."
-		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
-	});
+//	add
+//	({
+//		"!ban"
+//		, "!ban <server> <client#>."
+//		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+//	});
+//	add
+//	({
+//		"!kick"
+//		, "!kick <server> <client#>."
+//		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+//	});
+//	add
+//	({
+//		"!warn"
+//		, "!warn <server> <client#>."
+//		, [&](const message& msg){ rcon_short(msg); }//, "!namelog"); }
+//	});
 	add
 	({
 		"!showbans"
@@ -2801,6 +2805,9 @@ str RConicsIrcBotPlugin::get_version() const { return VERSION; }
 
 void RConicsIrcBotPlugin::exit()
 {
+	bug_func();
+	static siz count = 0;
+	bug_var(++count);
 	automsg_timer.turn_off();
 }
 
