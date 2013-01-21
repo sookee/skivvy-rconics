@@ -37,8 +37,12 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 // RPC
 #include <skivvy/plugin-oastats.h>
+#include <skivvy/store.h>
 
 namespace skivvy { namespace ircbot {
+
+using namespace skivvy;
+using namespace skivvy::utils;
 
 struct automsg
 {
@@ -155,6 +159,7 @@ private:
 	rcon_server_map& get_rcon_server_map();
 
 	RandomTimer automsg_timer;
+	BackupStore store;
 
 	str var_sub(const str& s, const str& server);
 	void regular_poll();
@@ -322,6 +327,7 @@ public:
 
 	// INTERFACE: IrcBotPlugin
 
+	virtual str get_id() const;
 	virtual str get_name() const;
 	virtual str get_version() const;
 	virtual void exit();

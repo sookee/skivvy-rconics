@@ -60,7 +60,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 namespace skivvy { namespace ircbot {
 
 IRC_BOT_PLUGIN(RConicsIrcBotPlugin);
-PLUGIN_INFO("OA rcon utils", "0.2");
+PLUGIN_INFO("rconics", "OA rcon utils", "0.2");
 
 using namespace skivvy;
 using namespace skivvy::irc;
@@ -117,6 +117,15 @@ const str SEARCH_ENGINE_ISP = "rconics.engine.isp";
 
 const str RCON_LOG_FILE = "rconics.log.file";
 const str RCON_LOG_FILE_DEFAULT = "rconics-rcon.log";
+const str RCONICS_STORE = "rconics.store.file";
+const str RCONICS_STORE_DEFAULT = "rconics-store.txt";
+
+const str RCONICS_DB_NAME = "rconics.db.name.file";
+const str RCONICS_DB_NAME_DEFAULT = "rconics-db-name.txt";
+const str RCONICS_DB_IP = "rconics.db.ip.file";
+const str RCONICS_DB_IP_DEFAULT = "rconics-db-ip.txt";
+const str RCONICS_DB_NOTE = "rconics.db.note.file";
+const str RCONICS_DB_NOTE_DEFAULT = "rconics-db-note.txt";
 
 
 // alias: GUID, name
@@ -136,6 +145,7 @@ std::mutex RConicsIrcBotPlugin::db_mtx;
 RConicsIrcBotPlugin::RConicsIrcBotPlugin(IrcBot& bot)
 : BasicIrcBotPlugin(bot)
 , automsg_timer([&](const void*){ regular_poll(); })
+, store(bot.getf(RCONICS_STORE, RCONICS_STORE_DEFAULT))
 {
 }
 
@@ -865,8 +875,14 @@ void RConicsIrcBotPlugin::write_to_db(const str& db, const str& guid_in
 	, const str& data, DB_SORT sort)
 {
 	// TODO: use standard variables "data_dir" etc...
-	const str db_file = "data/rconics-db-" + db + ".txt";
-	const str tmp_file = "data/rconics-db-tmp.txt";
+	str db_file = "rconics-db-" + db + ".txt";
+	str tmp_file = "rconics-db-tmp.txt";
+
+	if(db == "name")
+		db_file = bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT);
+	else
+		db_file = bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT);
+
 
 	if(!is_guid(guid_in))
 	{
@@ -1072,11 +1088,10 @@ str RConicsIrcBotPlugin::var_sub(const str& s, const str& server)
 
 				{
 					lock_guard lock(db_mtx);
-					std::ifstream ifs("data/rconics-db-name.txt");
+					sifs ifs(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 					while(ifs >> r)
 						if(lowercase(r.guid) == lowercase(guid))
 							names.insert(ent(r.count, r.data));
-					ifs.close();
 				}
 
 				if(!names.empty())
@@ -1189,7 +1204,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	siz ival = bot.get(RCON_STATS_INTERVAL, RCON_STATS_INTERVAL_DEFAULT);
 	//bug_var(do_stats.count(s.first));
 	// every ival minutes
-	if(!do_stats.empty() && polltime(poll::STATS, ival * 60) && bot.has_plugin("OA Stats Reporter"))
+	if(!do_stats.empty() && polltime(poll::STATS, ival * 60) && bot.has_plugin("oastats"))
 	{
 		//bug("Have OA Stats Reporter");
 		for(const str& server: do_stats)
@@ -1652,20 +1667,28 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 {
 	bug_func();
 
-	IrcBotPluginPtr ptr = bot.get_plugin("OA Stats Reporter");
-	OAStatsIrcBotPlugin* plugin = dynamic_cast<OAStatsIrcBotPlugin*>(ptr.get());
-//	std::shared_ptr<OAStatsIrcBotPlugin> plugin = bot.get_typed_plugin<OAStatsIrcBotPlugin>("OA Stats Reporter");
-	if(!plugin)
+//	IrcBotPluginPtr ptr = bot.get_plugin("oastats");
+//	OAStatsIrcBotPlugin* plugin = dynamic_cast<OAStatsIrcBotPlugin*>(ptr.get());
+//
+//	if(!plugin)
+//	{
+//		log("Plugin oastats not found.");
+//		return false;
+//	}
+
+	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
+		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
+//	bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
+
+	if(!ph)
 	{
-		log("OA Stats Reporter not found.");
+		log("Plugin oastats not found.");
 		return false;
 	}
 
-//	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
-//		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("OA Stats Reporter");
-	bot.get_plugin_handle<OAStatsIrcBotPlugin>("OA Stats Reporter");
 
-	return plugin->get_oatop(params, v);
+	return ph->get_oatop(params, v);
+//	return plugin->get_oatop(params, v);
 
 //	return false;
 
@@ -1691,6 +1714,9 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 bool RConicsIrcBotPlugin::whois(const message& msg)
 {
 	BUG_COMMAND(msg);
+
+	bug_var(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
+	bug_var(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 
 	static const str prompt = IRC_BOLD + IRC_COLOR + IRC_Purple + "whois"
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
@@ -1747,14 +1773,14 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	if(is_guid(query, 2))
 	{
 		lock_guard lock(db_mtx);
-		ifs.open("data/rconics-db-name.txt");
+		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		while(ifs >> r)
 			if(exact && lowercase(r.guid) == query)
 				names[r.guid].insert(ent(r.count, r.data));
 			else if(!exact && lowercase(r.guid).find(query) != str::npos)
 				names[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
-		ifs.open("data/rconics-db-ip.txt");
+		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
 			if(exact && lowercase(r.guid) == query)
 				ips[r.guid].insert(ent(r.count, r.data));
@@ -1767,14 +1793,14 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	{
 		//bug("IP Query: " << query);
 		lock_guard lock(db_mtx);
-		ifs.open("data/rconics-db-ip.txt");
+		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
 			if(exact && r.data == query)
 				ips[r.guid].insert(ent(r.count, r.data));
 			else if(!exact && !r.data.find(query)) // starts with
 				ips[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
-		ifs.open("data/rconics-db-name.txt");
+		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		while(ifs >> r)
 			if(ips.find(r.guid) != ips.end())
 				names[r.guid].insert(ent(r.count, r.data));
@@ -1785,7 +1811,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	{
 		// match on name
 		lock_guard lock(db_mtx);
-		ifs.open("data/rconics-db-name.txt");
+		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		siz count = 0;
 		while(ifs >> r)
 		{
@@ -1803,7 +1829,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 			}
 		}
 		ifs.close();
-		ifs.open("data/rconics-db-ip.txt");
+		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
 			if(names.find(r.guid) != names.end())
 				ips[r.guid].insert(ent(r.count, r.data));
@@ -1929,14 +1955,14 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 
 		lock_guard lock(db_mtx);
 
-		std::ifstream ifs("data/rconics-db-note.txt");
+		sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		while(std::getline(ifs >> g >> std::ws, note))
 			if(g == guid)
 				notes.push_back(note);
 		ifs.close();
 		notes.push_back(text);
 
-		std::ofstream ofs("data/rconics-db-note.txt");
+		sofs ofs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		for(const str& note: notes)
 			ofs << guid << ' ' << note << '\n';
 		ofs.close();
@@ -1965,7 +1991,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 				notes.push_back(++i == n ? text : note);
 		ifs.close();
 
-		std::ofstream ofs("data/rconics-db-note.txt");
+		sofs ofs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		for(const str& note: notes)
 			ofs << guid << ' ' << note << '\n';
 		ofs.close();
@@ -2022,13 +2048,13 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 
 		lock_guard lock(db_mtx);
 
-		std::ifstream ifs("data/rconics-db-note.txt");
+		sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		for(siz i = 0; std::getline(ifs >> g >> std::ws, note);)
 			if(g == guid && ++i != n)
 				notes.push_back(note);
 		ifs.close();
 
-		std::ofstream ofs("data/rconics-db-note.txt");
+		sofs ofs(bot.getf(RCONICS_DB_NOTE,RCONICS_DB_NOTE_DEFAULT));
 		for(const str& note: notes)
 			ofs << guid << ' ' << note << '\n';
 		ofs.close();
@@ -2038,7 +2064,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 	{
 		str g, note;
 		lock_guard lock(db_mtx);
-		std::ifstream ifs("data/rconics-db-note.txt");
+		sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		for(siz i = 0; std::getline(ifs >> g >> std::ws, note);)
 			if(g == guid)
 				bot.fc_reply(msg, prompt + " " + std::to_string(++i) + " " + note);
@@ -2469,11 +2495,10 @@ bool RConicsIrcBotPlugin::adminkill(const message& msg)
 		// get all their IP addresses
 		db_rec r;
 		str_set ips;
-		std::ifstream ifs("data/rconics-db-ip.txt");
+		sifs ifs(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
 			if(lowercase(r.guid) == lowercase(guid))
 				ips.insert(r.data);
-		ifs.close();
 
 		// Remove their !admin rights
 		ret = do_rcon(msg, "!setlevel " + admins[guid] + " 0", s);
@@ -2661,7 +2686,7 @@ bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
 
 bool RConicsIrcBotPlugin::initialize()
 {
-	if(!bot.has_plugin("OA Stats Reporter", "0.1"))
+	if(!bot.has_plugin("oastats", "0.1"))
 	{
 		log(get_name() << " requires OA Stats Reporter plugin.");
 		return false;
@@ -2800,6 +2825,7 @@ bool RConicsIrcBotPlugin::initialize()
 
 // INTERFACE: IrcBotPlugin
 
+str RConicsIrcBotPlugin::get_id() const { return ID; }
 str RConicsIrcBotPlugin::get_name() const { return NAME; }
 str RConicsIrcBotPlugin::get_version() const { return VERSION; }
 
