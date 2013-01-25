@@ -2150,7 +2150,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 			if(args[0] == "on")
 				do_automsg = true;
 			else if(args[0] == "off")
-				do_automsg = true;
+				do_automsg = false;
 			else
 				return bot.cmd_error(msg, prompt + "Expected on|off.");
 			save_automsg_state_to_store();
@@ -2339,8 +2339,10 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	{
 		// !rconmsg <server> (on|off)
 		lock_guard lock(automsgs_mtx);
-		do_automsg_for.insert(server);
-		bot.fc_reply(msg, prompt + "Sending messages has been turned on for " + server + ".");
+		if(do_automsg_for.insert(server).second)
+			bot.fc_reply(msg, prompt + "Sending messages has been turned on for " + server + ".");
+		else
+			bot.fc_reply(msg, prompt + "Sending messages is already turned on for " + server + ".");
 		save_automsg_state_to_store();
 	}
 	else if(cmd == "off")
@@ -2368,7 +2370,7 @@ bool RConicsIrcBotPlugin::save_automsg_state_to_store()
 
 bool RConicsIrcBotPlugin::load_automsg_state_to_store()
 {
-	do_automsg = store.get<bool>("automsg.do_automsg", do_automsg);
+	do_automsg = store.get<bool>("automsg.do_automsg");//, do_automsg);
 	do_automsg_for = store.get<str_set>("automsg.do_automsg_for", do_automsg_for);
 	automsg_subs = store.get<chan_set_map>("automsg.automsg_subs");
 	return true;
