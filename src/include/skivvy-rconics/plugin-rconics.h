@@ -189,16 +189,12 @@ private:
 	bool do_automsg = true;
 	str_set do_automsg_for; // server
 	chan_set_map automsg_subs; // automsg subscriptions
-	std::mutex automsg_subs_mtx;
 
-//	bool do_stats = false;
 	str_set do_stats; // servers to announce stats to
 
 	chan_set stats_subs; // stats subscriptions
 	std::mutex stats_subs_mtx;
-//	bool echomsg = false;
 
-//	bool autoban_check(const str& server, const str& line, const str& data, str& test);
 	typedef str_map location_map;
 
 	str get_isp(const str& ip);

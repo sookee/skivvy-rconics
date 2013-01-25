@@ -1176,35 +1176,27 @@ void RConicsIrcBotPlugin::regular_poll()
 			if(!amsg.when)
 				amsg.when = std::time(0) - rand_int(0, amsg.repeat);
 
-			//bug_var(amsg.when);
-			//bug_var(amsg.repeat);
-			//bug_var(delay(std::time(0) - amsg.when));
-			if(amsg.repeat < delay(std::time(0) - amsg.when))
+			if(delay(std::time(0) - amsg.when) < amsg.repeat)
+				continue;
+
+			oss.str("");
+			oss << amsg.method << ' ' << amsg.text;
+			str text = var_sub(oss.str(), amsg.server);
+
+			str ret;
+			if(!text.empty())
+				ret = rcon(text, sm.at(amsg.server));
+			//bug_var(ret);
+			amsg.when = std::time(0);
+
+			// Echo to all subscribing channels
+			if(!automsg_subs.count(amsg.server))
+				continue;
+			for(const str& chan: automsg_subs[amsg.server])
 			{
-				oss.str("");
-				oss << amsg.method << ' ' << amsg.text;
-				str text = var_sub(oss.str(), amsg.server);
-
-				str ret;
-				if(!text.empty())
-					ret = rcon(text, sm.at(amsg.server));
-				//bug_var(ret);
-				amsg.when = std::time(0);
-
-				// Echo to all subscribing channels
-				if(automsg_subs.count(amsg.server))
-				{
-					lock_guard lock(automsg_subs_mtx);
-					if(automsg_subs.count(amsg.server))
-						for(const str& chan: automsg_subs[amsg.server])
-						{
-							message msg;
-							msg.to = chan; // fudge message for reply to correct channel
-							bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
-						}
-//						for(const message& msg: automsg_subs[amsg.server])
-//							bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
-				}
+				message msg;
+				msg.to = chan; // fudge message for reply to correct channel
+				bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
 			}
 		}
 	}
@@ -1359,7 +1351,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				continue;
 
 			parsed = true;
-			//log("LISTPLAYERS: " << p.num << ' ' << p.guid << ' ' << p.name);
+
 			if(trim(p.guid).empty())
 				continue;
 
@@ -1435,9 +1427,6 @@ void RConicsIrcBotPlugin::regular_poll()
 				log("IP PARSE ERROR: " << prev_line[0]);
 				log("IP PARSE ERROR: " << prev_line[1]);
 				log("IP PARSE ERROR: " << line);
-//				bug("==================================================");
-//				bug(res);
-//				bug("==================================================");
 				continue;
 			}
 
@@ -1446,7 +1435,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			str name; // can be empty, if so keep name from !listplayers
 			std::getline(iss, name);
-			//log("STATUS     : " << p.num << ' ' << p.ping << ' ' << ip << ' '<< name);
+
 			if(!name.empty() && name != "^7")
 				p.name = name;
 
@@ -1460,21 +1449,6 @@ void RConicsIrcBotPlugin::regular_poll()
 				if(autounban_check(server, line, test) && p.guid == test)
 					unreasons.push_back("AUTO-BAN PROTECTION BY GUID: " + p.guid);
 
-			// rconics.autoban.ip: goo 188.162.80.53
-			// rconics.autoban.name: goo {04:00,10:00} "^0UnnamedPlayer^7"
-			// rconics.autoban.loc: goo {04:00,10:00} "Kingston upon Hull"
-			// rconics.autoban.isp: goo {04:00,10:00} "Virgin Media"
-
-//			static str_map ban_cache;
-//			static str_map unban_cache;
-//			static time_t bans_loaded = 0;
-//
-//			if(bans_loaded < bot.get_config_load_time())
-//			{
-//				ban_cache.clear();
-//				unban_cache.clear();
-//				bans_loaded = std::time(0);
-//			}
 			// AUTOBAN BY TIME AND IP
 
 			for(const str& line: bot.get_vec(BAN_BY_IP))
@@ -1501,50 +1475,6 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			if(unreasons.empty() && !reasons.empty())
 			{
-				// str cmd = "!ban " + std::to_string(p.num)	+ " AUTOBAN";
-
-				// 2012-07-18 03:30:50: STATUS     : 1 103 90.192.206.157 ^3*^7m^3*^^1Z^6immer^4106^7
-				// 2012-07-18 03:30:50: STATUS     : 10 999 181.95.101.149 ^0UnnamedPlayer^7
-				// 2012-07-18 03:30:50: AUTO-BAN BY NAME: ^0UnnamedPlayer^7
-
-				// Correctly !ban client #10 in admin.log
-				// 19:15: -1: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: console: : ban: "10 AUTOBAN"
-
-				// Incorrectly kicked client #1 according to rcon return info (and reality)
-				// 2012-07-18 03:30:52: !ban  RESULT: !ban: WARNING bot or without GUID or IP cannot write to ban file
-				// broadcast: print "^3*^7m^3*^^1Z^6immer^4106^7 has been banned by console^7, duration: PERMANENT, reason: AUTOBAN\n"
-				// Kill: 1022 1 20: <world> killed ^3*^7m^3*^^1Z^6immer^4106 by MOD_SUICIDE
-				// PlayerScore: 1 51: ^3*^7m^3*^^1Z^6immer^4106 now has 51 points
-				// Playerstore: Stored player with guid: 2A5E71DF80B9A6BA7796CB3F1DE6454E in 0
-				// ClientDisconnect: 1
-
-				// Incorrectly kicked client #1 according to server.log
-				// (note client #10 leaves before kick is issued)
-				// 19:10 ClientUserinfoChanged: 10 n\UnnamedPlayer\t\3\model\beret/red\hmodel\beret/red\g_redteam\\g_blueteam\\c1\\c2\\hc\100\w\0\l\0\tt\0\tl\0\id\74587B3A2D1BE4AD3D87887957D295B6
-				// 19:10 ClientConnect: 10
-				// 19:12 Kill: 8 3 10: ^1*M^5*^1^^5L^1E^5G^1E^5N^1D killed Pixelized by MOD_RAILGUN
-				// 19:12 PlayerScore: 8 83: ^1*M^5*^1^^5L^1E^5G^1E^5N^1D now has 83 points
-				// 19:12 Challenge: 8 215 1: Client 8 got award 215
-				// 19:12 Challenge: 8 1 1: Client 8 got award 1
-				// 19:12 Challenge: 3 2 1: Client 3 got award 2
-				// 19:12 Award: 8 1: ^1*M^5*^1^^5L^1E^5G^1E^5N^1D gained the EXCELLENT award!
-				// 19:12 Challenge: 8 302 1: Client 8 got award 302
-				// 19:12 Award: 8 2: ^1*M^5*^1^^5L^1E^5G^1E^5N^1D gained the IMPRESSIVE award!
-				// 19:12 Challenge: 8 301 1: Client 8 got award 301
-				// 19:12 Kill: 5 8 10: ^1D^2i^3n^4g^5L^6e^7s killed ^1*M^5*^1^^5L^1E^5G^1E^5N^1D by MOD_RAILGUN
-				// 19:12 PlayerScore: 5 28: ^1D^2i^3n^4g^5L^6e^7s now has 28 points
-				// 19:12 Challenge: 5 215 1: Client 5 got award 215
-				// 19:12 Challenge: 5 1 1: Client 5 got award 1
-				// 19:12 Challenge: 8 2 1: Client 8 got award 2
-				// 19:13 ClientDisconnect: 10
-				// 19:13 Item: 6 team_CTF_blueflag
-				// 19:13 PlayerScore: 6 78: portuano now has 78 points
-				// 19:13 CTF: 6 2 2: portuano returned the BLUE flag!
-				// 19:15 Kill: 1022 1 20: <world> killed ^3*^7m^3*^^1Z^6immer^4106 by MOD_SUICIDE
-				// 19:15 PlayerScore: 1 51: ^3*^7m^3*^^1Z^6immer^4106 now has 51 points
-				// 19:15 Playerstore: Stored player with guid: 2A5E71DF80B9A6BA7796CB3F1DE6454E in 0
-				// 19:15 ClientDisconnect: 1
-
 				str cmd = "!ban " + ip	+ " AUTOBAN"; // use ip because #num is buggy
 				log("cmd: " << cmd);
 				res = rcon(cmd, sm.at(server));
@@ -1609,7 +1539,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				oss.str("");
 				oss << "!rename " << p.num << ' ' << renames[server][p.name];
 				str ret = rcon(oss.str(), sm.at(server));
-//				bug_var(ret);
+
 				for(const str& chan: renames_subs[server])
 				{
 					message msg;
@@ -1618,12 +1548,6 @@ void RConicsIrcBotPlugin::regular_poll()
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
 				}
-//				for(const message& msg: renames_subs[server])
-//				{
-//					std::istringstream iss(trim(ret));
-//					for(str line; std::getline(iss, line);)
-//						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
-//				}
 				continue;
 			}
 
@@ -1659,13 +1583,6 @@ void RConicsIrcBotPlugin::regular_poll()
 							if(line.find("!putteam") != str::npos)
 								bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
 					}
-//					for(const message& msg: reteams_subs[server])
-//					{
-//						std::istringstream iss(trim(ret));
-//						for(str line; getline(iss, line);)
-//							if(line.find("!putteam") != str::npos)
-//								bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
-//					}
 				}
 			}
 
@@ -1674,13 +1591,11 @@ void RConicsIrcBotPlugin::regular_poll()
 			const dbent e(p.guid, ip, p.name);
 			if(!db_record.count(e))
 			{
-//				bug("DB_CACHE: inserting: " << e.guid << ", " << e.ip << ", " << e.name);
 				db_cache.insert(e);
 				db_record.insert(e);
 			}
 		}
 
-//		bug_var(write_db);
 		if(write_db && polltime(poll::DB_WRITE, 5 * 60) && !db_cache.empty())
 		{
 			for(const dbent& e: db_cache)
@@ -1690,7 +1605,6 @@ void RConicsIrcBotPlugin::regular_poll()
 				write_to_db("name", e.guid, e.name, DB_SORT::MOST_POPULAR);
 			}
 			db_cache.clear();
-//			bug_var(db_record.size());
 		}
 	}
 }
@@ -1699,48 +1613,14 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 {
 	bug_func();
 
-//	IrcBotPluginPtr ptr = bot.get_plugin("oastats");
-//	OAStatsIrcBotPlugin* plugin = dynamic_cast<OAStatsIrcBotPlugin*>(ptr.get());
-//
-//	if(!plugin)
-//	{
-//		log("Plugin oastats not found.");
-//		return false;
-//	}
-
 	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
 		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
-//	bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
 
-	if(!ph)
-	{
-		log("Plugin oastats not found.");
-		return false;
-	}
+	if(ph)
+		return ph->get_oatop(params, v);
 
-
-	return ph->get_oatop(params, v);
-//	return plugin->get_oatop(params, v);
-
-//	return false;
-
-//	IrcBotRPCService* s = bot.get_rpc_service("OA Stats Reporter");
-//	if(!s)
-//	{
-//		log("IrcBotRPCService not present.");
-//		return false;
-//	}
-//	bool ret = false;
-//	IrcBotRPCService::call_ptr c = s->create_call();
-//	//local_call* cp = dynamic_cast<local_call*>(&(*c));
-//	c->set_func("get_oatop");
-//	c->add_param(params);
-//	c->add_param(v);
-//	s->rpc(*c);
-//	ret = c->get_return_value<bool>();
-//	v.clear();
-//	c->get_return_param(v);
-//	return ret;
+	log("Plugin oastats not found.");
+	return false;
 }
 
 bool RConicsIrcBotPlugin::whois(const message& msg)
