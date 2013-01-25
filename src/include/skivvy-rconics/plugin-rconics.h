@@ -48,7 +48,7 @@ using namespace skivvy::utils;
 struct automsg
 {
 	bool active = false;
-	message owner;
+	//message owner;
 	str server; // server name
 	str method; // say | chat | cp
 	delay repeat; // delay in seconds
@@ -60,7 +60,7 @@ struct automsg
 	friend std::ostream& operator<<(std::ostream& os, const automsg& amsg)
 	{
 		os << amsg.active << '\n';
-		os << amsg.owner << '\n';
+		//os << amsg.owner << '\n';
 		os << amsg.server << '\n';
 		os << amsg.method << '\n';
 		os << amsg.repeat << '\n';
@@ -69,10 +69,11 @@ struct automsg
 		return os;
 	}
 
+	// true,{owner},zim,chat,12m,Some text to print
 	friend std::istream& operator>>(std::istream& is, automsg& amsg)
 	{
 		is >> amsg.active >> std::ws;
-		is >> amsg.owner >> std::ws;
+		//is >> amsg.owner >> std::ws;
 		is >> amsg.server >> std::ws;
 		is >> amsg.method >> std::ws;
 		is >> amsg.repeat >> std::ws;

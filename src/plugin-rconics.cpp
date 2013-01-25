@@ -2066,7 +2066,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		bug("amsg.text  : " << amsg.text);
 
 		std::time(&amsg.when);
-		amsg.owner = msg;
+		//amsg.owner = msg;
 		amsg.active = true;
 		lock_guard lock(automsgs_mtx);
 		automsgs.push_back(amsg);
@@ -2101,12 +2101,12 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		for(const automsg& amsg: automsgs)
 		{
 			std::cout << "XXXXX: active: " << amsg.active << '\n';
-			std::cout << "XXXXX: owner.line: " << amsg.owner.line << '\n';
-			std::cout << "XXXXX: owner.from: " << amsg.owner.from << '\n';
-			std::cout << "XXXXX: owner.cmd: " << amsg.owner.cmd << '\n';
-			std::cout << "XXXXX: owner.params: " << amsg.owner.params << '\n';
-			std::cout << "XXXXX: owner.to: " << amsg.owner.to << '\n';
-			std::cout << "XXXXX: owner.text: " << amsg.owner.text << '\n';
+			//std::cout << "XXXXX: owner.line: " << amsg.owner.line << '\n';
+//			std::cout << "XXXXX: owner.from: " << amsg.owner.from << '\n';
+//			std::cout << "XXXXX: owner.cmd: " << amsg.owner.cmd << '\n';
+//			std::cout << "XXXXX: owner.params: " << amsg.owner.params << '\n';
+//			std::cout << "XXXXX: owner.to: " << amsg.owner.to << '\n';
+//			std::cout << "XXXXX: owner.text: " << amsg.owner.text << '\n';
 			std::cout << "XXXXX: server: " << amsg.server << '\n';
 			std::cout << "XXXXX: method: " << amsg.method << '\n';
 			std::cout << "XXXXX: repeat: " << amsg.repeat << '\n';
