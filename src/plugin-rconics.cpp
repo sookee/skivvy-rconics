@@ -454,16 +454,18 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 void RConicsIrcBotPlugin::read_automsgs()
 {
 	automsg amg;
-	lock_guard lock(automsgs_mtx);
+//	lock_guard lock(automsgs_mtx);
 	std::ifstream ifs(bot.getf(RCON_AUTOMSG_FILE, RCON_AUTOMSG_FILE_DEFAULT));
 	automsgs.clear();
 	while(ifs >> amg)
 		automsgs.push_back(amg);
+	log("automsgs.size(): " << automsgs.size());
 }
 
 void RConicsIrcBotPlugin::write_automsgs()
 {
-	lock_guard lock(automsgs_mtx);
+//	lock_guard lock(automsgs_mtx);
+	log("automsgs.size(): " << automsgs.size());
 	std::ofstream ofs(bot.getf(RCON_AUTOMSG_FILE, RCON_AUTOMSG_FILE_DEFAULT));
 	str sep;
 	for(const automsg& amsg: automsgs)
@@ -1194,8 +1196,14 @@ void RConicsIrcBotPlugin::regular_poll()
 				{
 					lock_guard lock(automsg_subs_mtx);
 					if(automsg_subs.count(amsg.server))
-						for(const message& msg: automsg_subs[amsg.server])
+						for(const str& chan: automsg_subs[amsg.server])
+						{
+							message msg;
+							msg.to = chan; // fudge message for reply to correct channel
 							bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
+						}
+//						for(const message& msg: automsg_subs[amsg.server])
+//							bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
 				}
 			}
 		}
@@ -1251,8 +1259,15 @@ void RConicsIrcBotPlugin::regular_poll()
 				oss << " " << v[i].name;
 				str ret = rcon(oss.str(), sm.at(server));
 
-				for(const message& msg: stats_subs)
+				for(const str& chan: stats_subs)
+				{
+					message msg;
+					msg.to = chan; // fudge mssage to reply to correct channel
 					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
+				}
+
+//				for(const message& msg: stats_subs)
+//					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
 
 				//bug("STATS ANNOUNCE: " << oss.str());
 				v.erase(v.begin() + i);
@@ -1595,12 +1610,20 @@ void RConicsIrcBotPlugin::regular_poll()
 				oss << "!rename " << p.num << ' ' << renames[server][p.name];
 				str ret = rcon(oss.str(), sm.at(server));
 //				bug_var(ret);
-				for(const message& msg: renames_subs[server])
+				for(const str& chan: renames_subs[server])
 				{
+					message msg;
+					msg.to = chan; // fudge
 					std::istringstream iss(trim(ret));
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
 				}
+//				for(const message& msg: renames_subs[server])
+//				{
+//					std::istringstream iss(trim(ret));
+//					for(str line; std::getline(iss, line);)
+//						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
+//				}
 				continue;
 			}
 
@@ -1627,13 +1650,22 @@ void RConicsIrcBotPlugin::regular_poll()
 					oss.str("");
 					oss << "!putteam " << p.num << ' ' << srmi->second.team;
 					str ret = rcon(oss.str(), sm.at(server));
-					for(const message& msg: reteams_subs[server])
+					for(const str& chan: reteams_subs[server])
 					{
+						message msg;
+						msg.to = chan; // fudge
 						std::istringstream iss(trim(ret));
 						for(str line; getline(iss, line);)
 							if(line.find("!putteam") != str::npos)
 								bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
 					}
+//					for(const message& msg: reteams_subs[server])
+//					{
+//						std::istringstream iss(trim(ret));
+//						for(str line; getline(iss, line);)
+//							if(line.find("!putteam") != str::npos)
+//								bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
+//					}
 				}
 			}
 
@@ -2114,12 +2146,14 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 			if(!is_user_valid(msg, K_ADMIN))
 				return bot.cmd_error(msg, prompt + msg.get_nick() + " is not admin.");
 
+			lock_guard lock(automsgs_mtx);
 			if(args[0] == "on")
 				do_automsg = true;
 			else if(args[0] == "off")
 				do_automsg = true;
 			else
 				return bot.cmd_error(msg, prompt + "Expected on|off.");
+			save_automsg_state_to_store();
 		}
 	}
 
@@ -2154,10 +2188,8 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		std::time(&amsg.when);
 		amsg.owner = msg;
 		amsg.active = true;
-		{
-			lock_guard lock(automsgs_mtx);
-			automsgs.push_back(amsg);
-		}
+		lock_guard lock(automsgs_mtx);
+		automsgs.push_back(amsg);
 		write_automsgs();
 		bot.fc_reply(msg, "Message added.");
 	}
@@ -2171,21 +2203,35 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		if(!(pos < automsgs.size()))
 			return bot.cmd_error(msg, prompt + "Number " + std::to_string(pos) + " out of range.");
 
-		{
-			lock_guard lock(automsgs_mtx);
-			for(siz i = 0; i < automsgs.size(); ++i)
-				if(automsgs[i].server == server)
-					if(!pos--) { automsgs.erase(automsgs.begin() + i); break; }
-		}
+		lock_guard lock(automsgs_mtx);
+		for(siz i = 0; i < automsgs.size(); ++i)
+			if(automsgs[i].server == server)
+				if(!pos--) { automsgs.erase(automsgs.begin() + i); break; }
+		save_automsg_state_to_store();
 		write_automsgs();
 		bot.fc_reply(msg, "Message deleted.");
 	}
 	else if(cmd == "list")
 	{
+		log("LIST");
+		log("automsgs.size(): " << automsgs.size());
 		siz i = 0;
 		lock_guard lock(automsgs_mtx);
+		log("automsgs.size(): " << automsgs.size());
 		for(const automsg& amsg: automsgs)
 		{
+			std::cout << "XXXXX: active: " << amsg.active << '\n';
+			std::cout << "XXXXX: owner.line: " << amsg.owner.line << '\n';
+			std::cout << "XXXXX: owner.from: " << amsg.owner.from << '\n';
+			std::cout << "XXXXX: owner.cmd: " << amsg.owner.cmd << '\n';
+			std::cout << "XXXXX: owner.params: " << amsg.owner.params << '\n';
+			std::cout << "XXXXX: owner.to: " << amsg.owner.to << '\n';
+			std::cout << "XXXXX: owner.text: " << amsg.owner.text << '\n';
+			std::cout << "XXXXX: server: " << amsg.server << '\n';
+			std::cout << "XXXXX: method: " << amsg.method << '\n';
+			std::cout << "XXXXX: repeat: " << amsg.repeat << '\n';
+			std::cout << "XXXXX: text: " << amsg.text << '\n';
+//			std::cout << amsg << '\n';
 			if(amsg.server == server)
 			{
 				str prefix = "x ";
@@ -2209,24 +2255,32 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 
 		if(state == "on")
 		{
-			lock_guard lock(automsg_subs_mtx);
-			if(automsg_subs[server].count(msg))
+			lock_guard lock(automsgs_mtx);
+			if(automsg_subs[server].count(msg.to)) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
+//			if(automsg_subs[server].count(msg))
+//				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
 			else
 			{
-				automsg_subs[server].insert(msg);
+				automsg_subs[server].insert(msg.to); // fudge
+//				automsg_subs[server].insert(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will now be echoed to this channel.");
+				save_automsg_state_to_store();
 			}
 		}
 		else if(state == "off")
 		{
-			lock_guard lock(automsg_subs_mtx);
-			if(!automsg_subs[server].count(msg))
+			lock_guard lock(automsgs_mtx);
+			if(!automsg_subs[server].count(msg.to)) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
+//			if(!automsg_subs[server].count(msg))
+//				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
 			else
 			{
-				automsg_subs[server].erase(msg);
+				automsg_subs[server].erase(msg.to); // fudge
+//				automsg_subs[server].erase(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will no longer be echoed to this channel.");
+				save_automsg_state_to_store();
 			}
 		}
 		else
@@ -2277,25 +2331,46 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					do_automsg_for.insert(server);
 				else if(state == "off")
 					do_automsg_for.erase(server);
+				save_automsg_state_to_store();
 			}
 		}
 	}
 	else if(cmd == "on")
 	{
 		// !rconmsg <server> (on|off)
+		lock_guard lock(automsgs_mtx);
 		do_automsg_for.insert(server);
 		bot.fc_reply(msg, prompt + "Sending messages has been turned on for " + server + ".");
+		save_automsg_state_to_store();
 	}
 	else if(cmd == "off")
 	{
 		// !rconmsg <server> (on|off)
+		lock_guard lock(automsgs_mtx);
 		do_automsg_for.erase(server);
 		bot.fc_reply(msg, prompt + "Sending messages has been turned off for " + server + ".");
+		save_automsg_state_to_store();
 	}
 	else
 	{
 		return bot.cmd_error(msg, help(msg.get_user_cmd()));
 	}
+	return true;
+}
+
+bool RConicsIrcBotPlugin::save_automsg_state_to_store()
+{
+	store.set("automsg.do_automsg", do_automsg);
+	store.set("automsg.do_automsg_for", do_automsg_for);
+	store.set("automsg.automsg_subs", automsg_subs);
+	return true;
+}
+
+bool RConicsIrcBotPlugin::load_automsg_state_to_store()
+{
+	do_automsg = store.get<bool>("automsg.do_automsg", do_automsg);
+	do_automsg_for = store.get<str_set>("automsg.do_automsg_for", do_automsg_for);
+	automsg_subs = store.get<chan_set_map>("automsg.automsg_subs");
 	return true;
 }
 
@@ -2339,7 +2414,8 @@ bool RConicsIrcBotPlugin::rename(const message& msg)
 	lock_guard lock1(renames_mtx);
 	renames[server][from] = to;
 	lock_guard lock2(renames_subs_mtx);
-	renames_subs[server].insert(msg);
+	renames_subs[server].insert(msg.to); // fudge
+//	renames_subs[server].insert(msg);
 
 	return true;
 }
@@ -2405,9 +2481,11 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 	lock_guard lock2(reteams_subs_mtx);
 	if(info.team == ' ')
-		reteams_subs[server].erase(reteams_subs[server].find(msg));
+		reteams_subs[server].erase(reteams_subs[server].find(msg.to)); // fudge
+//		reteams_subs[server].erase(reteams_subs[server].find(msg));
 	else
-		reteams_subs[server].insert(msg);
+		reteams_subs[server].insert(msg.to); // fudge
+//		reteams_subs[server].insert(msg);
 
 	return true;
 }
@@ -2550,13 +2628,16 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 		if(cmd == "on")
 		{
 			lock_guard lock(stats_subs_mtx);
-			stats_subs.insert(msg);
+			stats_subs.insert(msg.to); // fudge
 			bot.fc_reply(msg, "Stats announcing will now be echoed to this channel.");
+//			stats_subs.insert(msg);
+//			bot.fc_reply(msg, "Stats announcing will now be echoed to this channel.");
 		}
 		else if(cmd == "off")
 		{
 			lock_guard lock(stats_subs_mtx);
-			stats_subs.erase(msg);
+			stats_subs.erase(msg.to); // fudge
+//			stats_subs.erase(msg);
 			bot.fc_reply(msg, "Stats announcing will no longer be echoed to this channel.");
 		}
 	}
@@ -2692,7 +2773,12 @@ bool RConicsIrcBotPlugin::initialize()
 		return false;
 	}
 
-	read_automsgs();
+	{
+		lock_guard lock(automsgs_mtx);
+		load_automsg_state_to_store();
+		read_automsgs();
+		log("automsgs.size():" << automsgs.size());
+	}
 	add
 	({
 		"!alert"

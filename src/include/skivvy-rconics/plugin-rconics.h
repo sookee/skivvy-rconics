@@ -34,6 +34,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/ircbot.h>
 
 #include <ctime>
+#include <utility>
 
 // RPC
 #include <skivvy/plugin-oastats.h>
@@ -61,8 +62,8 @@ struct automsg
 		os << amsg.active << '\n';
 		os << amsg.owner << '\n';
 		os << amsg.server << '\n';
-		os << amsg.method<< '\n';
-		os << amsg.repeat<< '\n';
+		os << amsg.method << '\n';
+		os << amsg.repeat << '\n';
 		os << amsg.text;
 
 		return os;
@@ -178,18 +179,22 @@ private:
 	};
 
 
-	typedef std::set<message, cmp_messages> message_set;
-	typedef std::map<str, message_set> message_set_map;
+//	typedef std::set<message, cmp_messages> message_set;
+	typedef str_set chan_set;
+	typedef std::map<str, chan_set> chan_set_map;
+	typedef std::pair<const str, chan_set> chan_set_pair;
 
+	bool save_automsg_state_to_store();
+	bool load_automsg_state_to_store();
 	bool do_automsg = true;
 	str_set do_automsg_for; // server
-	message_set_map automsg_subs; // automsg subscriptions
+	chan_set_map automsg_subs; // automsg subscriptions
 	std::mutex automsg_subs_mtx;
 
 //	bool do_stats = false;
 	str_set do_stats; // servers to announce stats to
 
-	message_set stats_subs; // stats subscriptions
+	chan_set stats_subs; // stats subscriptions
 	std::mutex stats_subs_mtx;
 //	bool echomsg = false;
 
@@ -261,7 +266,7 @@ private:
 
 	// rename
 	typedef std::map<str, str_map> str_str_map;
-	typedef std::map<str, message_set> str_message_set_map;
+	typedef std::map<str, chan_set> str_message_set_map;
 
 	str_str_map renames; // {"server" -> {"from" -> "to"}}
 	std::mutex renames_mtx;
