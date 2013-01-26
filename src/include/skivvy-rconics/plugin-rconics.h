@@ -45,10 +45,18 @@ namespace skivvy { namespace ircbot {
 using namespace skivvy;
 using namespace skivvy::utils;
 
+struct automsg;
+
+std::ostream& serialize_0_1(std::ostream& os, const automsg& amsg);
+
+std::istream& deserialize_unversionned(std::istream& is, automsg& m);
+//std::istream& deserialize_unversionned(std::istream&& is, automsg& m);
+std::istream& deserialize_0_1(std::istream& is, automsg& m);
+//std::istream& deserialize_0_1(std::istream&& is, automsg& m);
+
 struct automsg
 {
 	bool active = false;
-	//message owner;
 	str server; // server name
 	str method; // say | chat | cp
 	delay repeat; // delay in seconds
@@ -57,32 +65,90 @@ struct automsg
 
 	automsg(): when(0) {}
 
-	friend std::ostream& operator<<(std::ostream& os, const automsg& amsg)
+	typedef std::function<std::istream&(std::istream&,automsg&)> deserialize_func;
+
+	static deserialize_func get_deserialize(const str& version)
 	{
-		os << amsg.active << '\n';
-		//os << amsg.owner << '\n';
-		os << amsg.server << '\n';
-		os << amsg.method << '\n';
-		os << amsg.repeat << '\n';
-		os << amsg.text;
-
-		return os;
-	}
-
-	// true,{owner},zim,chat,12m,Some text to print
-	friend std::istream& operator>>(std::istream& is, automsg& amsg)
-	{
-		is >> amsg.active >> std::ws;
-		//is >> amsg.owner >> std::ws;
-		is >> amsg.server >> std::ws;
-		is >> amsg.method >> std::ws;
-		is >> amsg.repeat >> std::ws;
-		std::getline(is, amsg.text);
-		amsg.when = 0;
-
-		return is;
+		if(version == "0.1")
+			return &deserialize_0_1;
+		return &deserialize_unversionned;
 	}
 };
+
+inline
+std::ostream& serialize_0_1(std::ostream& os, const automsg& m)
+{
+	os << '{' << m.active;
+	os << ',' << m.server;
+	os << ',' << m.method;
+	os << ',' << m.repeat;
+	os << ',' << escaped(m.text) << '}';
+	return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const automsg& m)
+{
+	return serialize_0_1(os, m);
+}
+
+// true,{owner},zim,chat,12m,Some text to print
+inline
+std::istream& deserialize_unversionned(std::istream& is, automsg& m)
+{
+	bug_func();
+	is >> m.active >> std::ws;
+	is >> m.server >> std::ws;
+	is >> m.method >> std::ws;
+	is >> m.repeat >> std::ws;
+	std::getline(is, m.text);
+	m.when = 0;
+
+	return is;
+}
+
+inline
+std::istream& deserialize_unversionned(std::istream&& is, automsg& m)
+{
+	return deserialize_unversionned(is, m);
+}
+
+inline
+std::istream& deserialize_0_1(std::istream& is, automsg& m)
+{
+	bug_func();
+	str o;
+	if(!getobject(is, o))
+		return is;
+	bug_var(o);
+	siss iss(o);
+	(iss >> m.active).ignore(1, ',');
+	sgl(iss, m.server, ',');
+	sgl(iss, m.method, ',');
+	(iss >> m.repeat).ignore(1, ',');
+	if(!sgl(iss, m.text))
+		is.setstate(std::ios::failbit); // protocol error
+	else
+		unescape(m.text);
+	return is;
+}
+
+inline
+std::istream& deserialize_0_1(std::istream&& is, automsg& m)
+{
+	return deserialize_0_1(is, m);
+}
+
+inline
+std::istream& operator>>(std::istream& is, automsg& m)
+{
+	return deserialize_0_1(is, m);
+}
+
+inline
+std::istream& operator>>(std::istream&& is, automsg& m)
+{
+	return operator>>(is, m);
+}
 
 /**
  *

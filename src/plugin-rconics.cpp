@@ -454,19 +454,38 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 void RConicsIrcBotPlugin::read_automsgs()
 {
 	automsg amg;
-//	lock_guard lock(automsgs_mtx);
 	std::ifstream ifs(bot.getf(RCON_AUTOMSG_FILE, RCON_AUTOMSG_FILE_DEFAULT));
+
+	// Check version info:
+	str version;
+	if(sgl(ifs, version) && !version.find("RCONICS_AUTOMSG: "))
+		version = version.substr(17);
+	else
+	{
+		version.clear();
+		ifs.clear();
+		ifs.seekg(0);
+	}
+
+	automsg::deserialize_func deserialize = automsg::get_deserialize(version);
+
 	automsgs.clear();
-	while(ifs >> amg)
-		automsgs.push_back(amg);
-	log("automsgs.size(): " << automsgs.size());
+	str line;
+	while(sgl(ifs, line))
+	{
+		bug_var(line);
+		siss iss(line);
+		if(deserialize(iss, amg))
+			automsgs.push_back(amg);
+	}
+	bug_var(automsgs.size());
 }
 
 void RConicsIrcBotPlugin::write_automsgs()
 {
-//	lock_guard lock(automsgs_mtx);
 	log("automsgs.size(): " << automsgs.size());
 	std::ofstream ofs(bot.getf(RCON_AUTOMSG_FILE, RCON_AUTOMSG_FILE_DEFAULT));
+	ofs << "RCONICS_AUTOMSG: 0.1" << '\n';
 	str sep;
 	for(const automsg& amsg: automsgs)
 		{ ofs << sep << amsg; sep = '\n'; }
@@ -939,48 +958,6 @@ void RConicsIrcBotPlugin::write_to_db(const str& db, const str& guid_in
 	ofs.close();
 }
 
-//void write_namelog_to_db(const str& text)
-//{
-//	// ^2|<^8MAD^1Kitty Too^7: ^2why no? ))
-//	// ^30  (*2BC45233)  77.123.107.231^7 '^2BDSM^7'
-//	// ^31  (*1DE6454E)  90.192.206.146^7 '^4A^5ngel ^4E^5yes^7'
-//	// -  (*4A8B117F)    86.1.110.133^7 'Andrius [LTU]^7'
-//	// ^33  (*F1147474)    37.47.104.24^7 'UFK POLAND^7'
-//	// ^34  (*ACF58F90)  95.118.224.206^7 '^1Vamp ^3G^1i^3r^1l^7'
-//	// ^35  (*EAF1A70C)  88.114.147.124^7 ':D^7'
-//	// -  (*E5DAD0FE)   201.37.205.57^7 '^1*^7M^1*^7^^1p^7ev^7'
-//	// -  (*B45368DF)    82.50.105.85^7 'Kiloren^7'
-//	// ^36  (*5F9DFD1F)      86.2.36.24^7 'SodaMan^7'
-//	// -  (*11045255)   79.154.175.14^7 '^3R^^2ocket^7' '^4G^1O^3O^4G^2L^1E^7'
-//
-//	std::istringstream iss(text);
-//	str line, skip, guid, ip, names, name;
-//	while(std::getline(iss, line))
-//	{
-//		bug("line: " << line);
-//		std::istringstream iss(line);
-//		if(std::getline(iss >> skip >> guid >> ip >> std::ws, names))
-//		{
-//			if(ip.size() < 7)
-//				continue;
-//			bug("skip : " << skip);
-//			bug("guid : " << guid);
-//			bug("ip   : " << ip);
-//			bug("names: " << names);
-//			if(is_ip(ip) && guid.size() == 11 && guid[0] == '(' && guid [1] == '*')
-//			{
-//				guid = guid.substr(2, 8);
-//				write_to_db("ip", guid, ip, DB_SORT::MOST_RECENT);
-//
-//				std::istringstream iss(names);
-//				while(std::getline(iss, skip, '\'') && std::getline(iss, name, '\''))
-//					write_to_db("name", guid, name, DB_SORT::MOST_POPULAR);
-//			}
-//			bug("");
-//		}
-//	}
-//}
-
 void log_namelog(const str& text)
 {
 	// ^2|<^8MAD^1Kitty Too^7: ^2why no? ))
@@ -1153,6 +1130,7 @@ bool autounban_check(const str& server, const str& line, str& ban)
 void RConicsIrcBotPlugin::regular_poll()
 {
 	//bug_func();
+	static message msg; // fudge
 
 	std::ostringstream oss;
 	const rcon_server_map& sm = get_rcon_server_map();
@@ -1160,7 +1138,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	if(do_automsg && polltime(poll::RCONMSG, 60))
 	{
 		lock_guard lock(automsgs_mtx);
-		//bug_var(automsgs.size());
+
 		for(automsg& amsg: automsgs)
 		{
 			if(!amsg.active)
@@ -1185,7 +1163,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			str ret;
 			if(!text.empty())
-				ret = rcon(text, sm.at(amsg.server));
+				ret = do_rcon(msg, text, sm.at(amsg.server));
 			//bug_var(ret);
 			amsg.when = std::time(0);
 
@@ -2034,6 +2012,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 			else
 				return bot.cmd_error(msg, prompt + "Expected on|off.");
 			save_automsg_state_to_store();
+			return true;
 		}
 	}
 
