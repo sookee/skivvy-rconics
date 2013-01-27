@@ -44,7 +44,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 #include <fstream>
 
-#include <tr1/regex>
+//#include <tr1/regex>
 
 #include <skivvy/ios.h>
 #include <skivvy/irc.h>
@@ -68,7 +68,7 @@ using namespace skivvy::types;
 using namespace skivvy::utils;
 using namespace skivvy::string;
 
-namespace tr1 = std::tr1;
+//namespace tr1 = std::tr1;
 
 
 // rconics.user: <user>
