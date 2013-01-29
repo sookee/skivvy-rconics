@@ -1,8 +1,8 @@
 /*
- * rcon.h
+ * plugin-rconics-rcon.cpp
  *
  *  Created on: 01 June 2012
- *      Author: oasookee@googlemail.com
+ *      Author: oaskivvy@gmail.com
  */
 
 /*-----------------------------------------------------------------.
@@ -42,7 +42,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <sstream>
 
 #include <skivvy/logrep.h>
-#include <skivvy-rconics/rcon.h>
+#include <skivvy-rconics/plugin-rconics-rcon.h>
 #include <skivvy/types.h>
 
 namespace skivvy { namespace net {

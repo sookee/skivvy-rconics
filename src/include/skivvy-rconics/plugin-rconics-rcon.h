@@ -1,5 +1,5 @@
 /*
- * rcon.h
+ * plugin-rconics-rcon.h
  *
  *  Created on: 01 June 2012
  *      Author: oasookee@googlemail.com

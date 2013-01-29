@@ -21,9 +21,9 @@
 # 
 # '-----------------------------------------------------------------*/
 
-#skivvydir = $(prefix)/include/skivvy
-plugindir = $(datadir)/skivvy/plugins
-docsdir = $(datadir)/skivvy
+plugin_includedir = $(prefix)/include/skivvy-pfinder
+plugin_librarydir = $(datadir)/skivvy/plugins
+plugin_manualsdir = $(datadir)/skivvy
 
 DEF_FLAGS = \
 	-D _GLIBCXX_USE_NANOSLEEP \
@@ -43,13 +43,17 @@ BOTLIBS = -ldl
 # -Wl,-E is required for programs that load plugin's
 BOTFLAGS = -Wl,-E
 
-plugin_LTLIBRARIES =  \
+plugin_include_HEADERS = \
+	$(srcdir)/include/skivvy-rconics/plugin-rconics.h \
+	$(srcdir)/include/skivvy-rconics/plugin-rconics-rcon.h
+
+plugin_library_LTLIBRARIES =  \
 	skivvy-plugin-rconics.la
 
 # IrcBot plugins
-skivvy_plugin_rconics_la_SOURCES = plugin-rconics.cpp rcon.cpp
+skivvy_plugin_rconics_la_SOURCES = plugin-rconics.cpp plugin-rconics-rcon.cpp
 skivvy_plugin_rconics_la_LDFLAGS = -module
 
-docs_DATA = $(top_srcdir)/docs/manual.text
+plugin_manuals_DATA = $(top_srcdir)/docs/manual.text
 
 extra_DIST = $(top_srcdir)/docs/manual.text

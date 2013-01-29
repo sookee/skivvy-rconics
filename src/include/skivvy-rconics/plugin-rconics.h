@@ -35,6 +35,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 #include <ctime>
 #include <utility>
+#include <chrono>
 
 // RPC
 #include <skivvy/plugin-oastats.h>
@@ -69,6 +70,8 @@ struct automsg
 
 	static deserialize_func get_deserialize(const str& version)
 	{
+		bug_func();
+		bug_var(version);
 		if(version == "0.1")
 			return &deserialize_0_1;
 		return &deserialize_unversionned;
@@ -169,19 +172,16 @@ private:
 		, RENAMES
 	};
 
-	typedef std::map<poll, time_t> pollmap;
+	typedef std::map<poll, st_time_point> pollmap;
 
 	pollmap polls;
 
-	inline bool polltime(const poll& p, siz secs)
+	inline bool polltime(const poll& p, const std::chrono::seconds& secs)
 	{
-		siz secs_so_far = siz(std::time(0) - polls[p]);
-//		bug_var(secs);
-//		bug_var(secs_so_far);
-		if(secs < secs_so_far)
+		if(polls[p] + secs < st_clk::now())
 		{
 			//bug("POLLING");
-			polls[p] = time(0);
+			polls[p] = st_clk::now() ;
 			return true;
 		}
 		return false;
@@ -189,7 +189,7 @@ private:
 
 	inline bool polltime(const poll& p, const str& var, siz dflt = 0)
 	{
-		return polltime(p, bot.get(var, dflt));
+		return polltime(p,  std::chrono::seconds(bot.get(var, dflt)));
 	}
 
 	// rconics.user: <user>

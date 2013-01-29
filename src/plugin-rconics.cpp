@@ -53,7 +53,8 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/ircbot.h>
 #include <skivvy/logrep.h>
 #include <skivvy/network.h>
-#include <skivvy-rconics/rcon.h>
+#include <skivvy-rconics/plugin-rconics-rcon.h>
+#include <skivvy/plugin-oastats.h>
 
 #include <skivvy/socketstream.h>
 
@@ -1135,7 +1136,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	std::ostringstream oss;
 	const rcon_server_map& sm = get_rcon_server_map();
 
-	if(do_automsg && polltime(poll::RCONMSG, 60))
+	if(do_automsg && polltime(poll::RCONMSG, std::chrono::seconds(60)))
 	{
 		lock_guard lock(automsgs_mtx);
 
@@ -1182,7 +1183,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	siz ival = bot.get(RCON_STATS_INTERVAL, RCON_STATS_INTERVAL_DEFAULT);
 	//bug_var(do_stats.count(s.first));
 	// every ival minutes
-	if(!do_stats.empty() && polltime(poll::STATS, ival * 60) && bot.has_plugin("oastats"))
+	if(!do_stats.empty() && polltime(poll::STATS, std::chrono::minutes(ival)) && bot.has_plugin("oastats"))
 	{
 		//bug("Have OA Stats Reporter");
 		for(const str& server: do_stats)
@@ -1510,7 +1511,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 				// Renaming of bots
 
-				if(!polltime(poll::RENAMES, 60) || renames[server].empty())
+				if(!polltime(poll::RENAMES, std::chrono::seconds(60)) || renames[server].empty())
 					continue;
 				if(renames[server].find(p.name) == renames[server].end())
 					continue;
@@ -1574,7 +1575,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			}
 		}
 
-		if(write_db && polltime(poll::DB_WRITE, 5 * 60) && !db_cache.empty())
+		if(write_db && polltime(poll::DB_WRITE, std::chrono::minutes(5)) && !db_cache.empty())
 		{
 			for(const dbent& e: db_cache)
 			{
@@ -1591,8 +1592,8 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 {
 	bug_func();
 
-	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
-		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
+	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph(bot, "");
+//		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
 
 	if(ph)
 		return ph->get_oatop(params, v);
@@ -1993,8 +1994,12 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	// <server> list
 	//
 
+	bug_var(do_automsg);
+
 	{
 		str_vec args = arg_split(msg.get_user_params());
+
+		bug_var(args.size());
 
 		if(args.empty())
 			return bot.cmd_error(msg, prompt + "No parameters.");
@@ -2011,6 +2016,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 				do_automsg = false;
 			else
 				return bot.cmd_error(msg, prompt + "Expected on|off.");
+			bug_var(do_automsg);
 			save_automsg_state_to_store();
 			return true;
 		}
@@ -2110,7 +2116,8 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		str state; // on | off
 		iss >> state;
 		state = lowercase(state);
-		bug("state: " << state);
+		bug_var(state);
+		bug_var(do_automsg);
 
 		if(state == "on")
 		{
@@ -2229,7 +2236,10 @@ bool RConicsIrcBotPlugin::save_automsg_state_to_store()
 
 bool RConicsIrcBotPlugin::load_automsg_state_to_store()
 {
+	bug_func();
+	bug_var(do_automsg);
 	do_automsg = store.get<bool>("automsg.do_automsg");//, do_automsg);
+	bug_var(do_automsg);
 	do_automsg_for = store.get<str_set>("automsg.do_automsg_for", do_automsg_for);
 	automsg_subs = store.get<chan_set_map>("automsg.automsg_subs");
 	return true;
@@ -2636,8 +2646,8 @@ bool RConicsIrcBotPlugin::initialize()
 
 	{
 		lock_guard lock(automsgs_mtx);
-		load_automsg_state_to_store();
 		read_automsgs();
+		load_automsg_state_to_store();
 		log("automsgs.size():" << automsgs.size());
 	}
 	add
