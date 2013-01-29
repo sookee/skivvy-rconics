@@ -21,7 +21,7 @@
 # 
 # '-----------------------------------------------------------------*/
 
-plugin_includedir = $(prefix)/include/skivvy-pfinder
+plugin_includedir = $(prefix)/include/skivvy-rconics
 plugin_librarydir = $(datadir)/skivvy/plugins
 plugin_manualsdir = $(datadir)/skivvy
 
@@ -54,6 +54,6 @@ plugin_library_LTLIBRARIES =  \
 skivvy_plugin_rconics_la_SOURCES = plugin-rconics.cpp plugin-rconics-rcon.cpp
 skivvy_plugin_rconics_la_LDFLAGS = -module
 
-plugin_manuals_DATA = $(top_srcdir)/docs/manual.text
+plugin_manuals_DATA = $(top_srcdir)/docs/rconics-manual.text
 
-extra_DIST = $(top_srcdir)/docs/manual.text
+extra_DIST = $(top_srcdir)/docs/rconics-manual.text
