@@ -1591,13 +1591,13 @@ void RConicsIrcBotPlugin::regular_poll()
 bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 {
 	bug_func();
-
-	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph(bot, "");
+//
+//	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
 //		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
-
-	if(ph)
-		return ph->get_oatop(params, v);
-
+//
+//	if(ph)
+//		return ph->get_oatop(params, v);
+//
 	log("Plugin oastats not found.");
 	return false;
 }
