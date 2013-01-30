@@ -2638,11 +2638,11 @@ bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
 
 bool RConicsIrcBotPlugin::initialize()
 {
-	if(!bot.has_plugin("oastats", "0.1"))
-	{
-		log(get_name() << " requires OA Stats Reporter plugin.");
-		return false;
-	}
+//	if(!bot.has_plugin("oastats", "0.1"))
+//	{
+//		log(get_name() << " requires OA Stats Reporter plugin.");
+//		return false;
+//	}
 
 	{
 		lock_guard lock(automsgs_mtx);
