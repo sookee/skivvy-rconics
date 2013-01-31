@@ -28,7 +28,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 '-----------------------------------------------------------------*/
 
-#include <skivvy-rconics/plugin-rconics.h>
+#include <skivvy/plugin-rconics.h>
 
 #include <iomanip>
 #include <array>
@@ -53,12 +53,12 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/ircbot.h>
 #include <skivvy/logrep.h>
 #include <skivvy/network.h>
-#include <skivvy-rconics/plugin-rconics-rcon.h>
+#include <skivvy/plugin-rconics-rcon.h>
 #include <skivvy/plugin-oastats.h>
 
 #include <skivvy/socketstream.h>
 
-namespace skivvy { namespace ircbot {
+namespace skivvy { namespace rconics {
 
 IRC_BOT_PLUGIN(RConicsIrcBotPlugin);
 PLUGIN_INFO("rconics", "OA rcon utils", "0.2");
@@ -67,6 +67,7 @@ using namespace skivvy;
 using namespace skivvy::irc;
 using namespace skivvy::types;
 using namespace skivvy::utils;
+using namespace skivvy::ircbot;
 using namespace skivvy::string;
 
 //namespace tr1 = std::tr1;
@@ -2794,4 +2795,4 @@ void RConicsIrcBotPlugin::exit()
 	automsg_timer.turn_off();
 }
 
-}} // sookee::ircbot
+}} // skivvy::rconics

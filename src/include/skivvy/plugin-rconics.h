@@ -41,10 +41,11 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/plugin-oastats.h>
 #include <skivvy/store.h>
 
-namespace skivvy { namespace ircbot {
+namespace skivvy { namespace rconics {
 
 using namespace skivvy;
 using namespace skivvy::utils;
+using namespace skivvy::ircbot;
 
 struct automsg;
 
@@ -404,6 +405,6 @@ public:
 
 };
 
-}} // sookee::ircbot
+}} // skivvy::rconics
 
 #endif // _SOOKEE_IRCBOT_RCONICS_H_

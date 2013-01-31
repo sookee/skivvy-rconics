@@ -26,22 +26,14 @@ AC_CONFIG_SRCDIR([src/plugin-rconics.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 AM_INIT_AUTOMAKE([1.10 foreign])
-#AM_SILENT_RULES([yes])
 
+AM_DISABLE_STATIC
 AM_PROG_LIBTOOL
 AC_PROG_CXX
 AC_PROG_INSTALL
 
 AC_LANG(C++)
 AC_MSG_CHECKING(if $CXX supports C++11)
-
-#CXXFLAGS="$CXXFLAGS -std=gnu++11"
-#AC_COMPILE_IFELSE(AC_LANG_PROGRAM([],[for(int i: {0})]),[cpp11=yes],[cpp11=no])
-#AC_MSG_RESULT($cpp11)
-#if test "$cpp11" = "no"; then
-#	AC_MSG_ERROR([C++11 support is required.])
-#fi
-
 
 AC_CONFIG_MACRO_DIR([m4])
 

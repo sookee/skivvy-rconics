@@ -42,7 +42,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <sstream>
 
 #include <skivvy/logrep.h>
-#include <skivvy-rconics/plugin-rconics-rcon.h>
+#include <skivvy/plugin-rconics-rcon.h>
 #include <skivvy/types.h>
 
 namespace skivvy { namespace net {

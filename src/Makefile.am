@@ -21,9 +21,9 @@
 # 
 # '-----------------------------------------------------------------*/
 
-plugin_includedir = $(prefix)/include/skivvy-rconics
-plugin_librarydir = $(datadir)/skivvy/plugins
-plugin_manualsdir = $(datadir)/skivvy
+plugin_includedir = $(includedir)/skivvy
+plugin_librarydir = $(libdir)/skivvy
+plugin_manualsdir = $(mandir)/skivvy
 
 DEF_FLAGS = \
 	-D _GLIBCXX_USE_NANOSLEEP \
@@ -44,16 +44,22 @@ BOTLIBS = -ldl
 BOTFLAGS = -Wl,-E
 
 plugin_include_HEADERS = \
-	$(srcdir)/include/skivvy-rconics/plugin-rconics.h \
-	$(srcdir)/include/skivvy-rconics/plugin-rconics-rcon.h
+	$(srcdir)/include/skivvy/plugin-rconics.h \
+	$(srcdir)/include/skivvy/plugin-rconics-rcon.h
 
 plugin_library_LTLIBRARIES =  \
 	skivvy-plugin-rconics.la
 
 # IrcBot plugins
 skivvy_plugin_rconics_la_SOURCES = plugin-rconics.cpp plugin-rconics-rcon.cpp
-skivvy_plugin_rconics_la_LDFLAGS = -module
+skivvy_plugin_rconics_la_LDFLAGS = -module -avoid-version
 
 plugin_manuals_DATA = $(top_srcdir)/docs/rconics-manual.text
 
 extra_DIST = $(top_srcdir)/docs/rconics-manual.text
+
+install-data-hook: $(plugin_library_LTLIBRARIES)
+	for m in $(plugin_library_LTLIBRARIES); do \
+		base=`echo $$m | sed 's/\..*//'`; \
+		rm -f $(plugin_librarydir)/$$base.la; \
+	done
