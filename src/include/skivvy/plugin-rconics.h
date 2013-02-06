@@ -242,7 +242,7 @@ private:
 	{
 		bool operator()(const message& m1, const message& m2) const
 		{
-			return m1.to < m2.to;
+			return m1.to_cp < m2.to_cp;
 		}
 	};
 
