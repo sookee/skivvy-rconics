@@ -138,7 +138,7 @@ struct cmp
 {
 	bool operator()(const message& m1, const message& m2) const
 	{
-		return m1.to_cp < m2.to_cp;
+		return m1.get_to() < m2.get_to();
 	}
 };
 
@@ -300,7 +300,7 @@ str RConicsIrcBotPlugin::do_rcon(const message& msg, str cmd, const str& host, s
 	else if(!cmd.find("cp"))
 		cmd +=  " - " + bot_name;
 	else if(!cmd.find("!ban") || !cmd.find("!adjust") || !cmd.find("!kick"))
-		cmd += " - " + msg.get_nick_cp();
+		cmd += " - " + msg.get_nickname();
 
 	oss << "rcon " << pass << " " << cmd;
 	net::rcon(oss.str(), res, host, port);
@@ -323,9 +323,9 @@ bool RConicsIrcBotPlugin::do_checked_rcon(const message& msg, const str& cmd, st
 		return false;
 	}
 
-	if(!rcon_user_valid(msg.from_cp, server))
+	if(!rcon_user_valid(msg.prefix, server))
 	{
-		bot.fc_reply(msg, msg.get_nick_cp() + " is not authorised for server " + server + ".");
+		bot.fc_reply(msg, msg.get_nickname() + " is not authorised for server " + server + ".");
 		return false;
 	}
 
@@ -333,7 +333,7 @@ bool RConicsIrcBotPlugin::do_checked_rcon(const message& msg, const str& cmd, st
 		lock_guard lock(rconlog_mtx);
 		std::ofstream ofs(bot.getf(RCON_LOG_FILE, RCON_LOG_FILE_DEFAULT), std::ios::app);
 		//ofs << msg << '\n';
-		ofs << get_stamp() << " " << msg.to_cp << " " << msg.from_cp << " " << cmd << '\n';
+		ofs << get_stamp() << " " << msg.get_to() << " " << msg.prefix << " " << cmd << '\n';
 	}
 	res = do_rcon(msg, cmd, s->second);
 
@@ -437,7 +437,7 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 	BUG_COMMAND(msg);
 
 	str server, cmd;
-	std::getline(std::istringstream(msg.get_user_params_cp()) >> server >> std::ws, cmd);
+	std::getline(std::istringstream(msg.get_user_params()) >> server >> std::ws, cmd);
 
 	str res;
 	if(!do_checked_rcon(msg, trim(cmd), res))
@@ -1175,7 +1175,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			for(const str& chan: automsg_subs[amsg.server])
 			{
 				message msg;
-				msg.to_cp = chan; // fudge message for reply to correct channel
+				msg.get_to() = chan; // fudge message for reply to correct channel
 				bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
 			}
 		}
@@ -1234,7 +1234,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: stats_subs)
 				{
 					message msg;
-					msg.to_cp = chan; // fudge mssage to reply to correct channel
+					msg.get_to() = chan; // fudge mssage to reply to correct channel
 					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
 				}
 
@@ -1523,7 +1523,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: renames_subs[server])
 				{
 					message msg;
-					msg.to_cp = chan; // fudge
+					msg.get_to() = chan; // fudge
 					std::istringstream iss(trim(ret));
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
@@ -1557,7 +1557,7 @@ void RConicsIrcBotPlugin::regular_poll()
 					for(const str& chan: reteams_subs[server])
 					{
 						message msg;
-						msg.to_cp = chan; // fudge
+						msg.get_to() = chan; // fudge
 						std::istringstream iss(trim(ret));
 						for(str line; getline(iss, line);)
 							if(line.find("!putteam") != str::npos)
@@ -1614,7 +1614,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
 	if(!is_user_valid(msg, WHOIS_USER))
-		return bot.cmd_error(msg, msg.get_nick_cp() + " is not authorised to use whois database.");
+		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised to use whois database.");
 
 	bool exact = false;
 	bool add_loc = false;
@@ -1623,7 +1623,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	str add_loc_type = "code";
 
 	siz chunk = 1;
-	std::istringstream iss(msg.get_user_params_cp());
+	std::istringstream iss(msg.get_user_params());
 
 	str query;
 	ios::getstring(iss, query);
@@ -1647,8 +1647,8 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		else if(!param.empty() && param[0] == '#')
 			std::istringstream(param.substr(1)) >> chunk;
 		else if(!param.empty())
-			return bot.fc_reply_help(msg, help(msg.get_user_cmd_cp())
-				, "04" + msg.get_user_cmd_cp() + ": 01");
+			return bot.fc_reply_help(msg, help(msg.get_user_cmd())
+				, "04" + msg.get_user_cmd() + ": 01");
 	}
 
 	if(!chunk)
@@ -1825,7 +1825,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
 	if(!is_user_valid(msg, WHOIS_USER))
-		return bot.cmd_error(msg, msg.get_nick_cp() + " is not authorised to use the whois database.");
+		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised to use the whois database.");
 
 	// !notes <GUID> (add <text> | mod <n> <text> | del <n> | list)
 
@@ -1998,7 +1998,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	bug_var(do_automsg);
 
 	{
-		str_vec args = arg_split(msg.get_user_params_cp());
+		str_vec args = arg_split(msg.get_user_params());
 
 		bug_var(args.size());
 
@@ -2008,7 +2008,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		if(args.size() == 1)
 		{
 			if(!is_user_valid(msg, K_ADMIN))
-				return bot.cmd_error(msg, prompt + msg.get_nick_cp() + " is not admin.");
+				return bot.cmd_error(msg, prompt + msg.get_nickname() + " is not admin.");
 
 			lock_guard lock(automsgs_mtx);
 			if(args[0] == "on")
@@ -2023,14 +2023,14 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		}
 	}
 
-	std::istringstream iss(msg.get_user_params_cp());
+	std::istringstream iss(msg.get_user_params());
 
 	str server;
 	iss >> server;
 	bug_var(server);
 
-	if(!rcon_user_valid(msg.from_cp, server))
-		return bot.cmd_error(msg, prompt + msg.get_nick_cp() + " is not authorised for " + server + ".");
+	if(!rcon_user_valid(msg.prefix, server))
+		return bot.cmd_error(msg, prompt + msg.get_nickname() + " is not authorised for " + server + ".");
 
 
 	str cmd;
@@ -2123,13 +2123,13 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		if(state == "on")
 		{
 			lock_guard lock(automsgs_mtx);
-			if(automsg_subs[server].count(msg.to_cp)) // fudge
+			if(automsg_subs[server].count(msg.get_to())) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
 //			if(automsg_subs[server].count(msg))
 //				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
 			else
 			{
-				automsg_subs[server].insert(msg.to_cp); // fudge
+				automsg_subs[server].insert(msg.get_to()); // fudge
 //				automsg_subs[server].insert(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will now be echoed to this channel.");
 				save_automsg_state_to_store();
@@ -2138,13 +2138,13 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		else if(state == "off")
 		{
 			lock_guard lock(automsgs_mtx);
-			if(!automsg_subs[server].count(msg.to_cp)) // fudge
+			if(!automsg_subs[server].count(msg.get_to())) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
 //			if(!automsg_subs[server].count(msg))
 //				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
 			else
 			{
-				automsg_subs[server].erase(msg.to_cp); // fudge
+				automsg_subs[server].erase(msg.get_to()); // fudge
 //				automsg_subs[server].erase(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will no longer be echoed to this channel.");
 				save_automsg_state_to_store();
@@ -2188,7 +2188,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					if(!automsgs[i].active)
 						automsgs[i].when = std::time(0) - rand_int(0, automsgs[i].repeat);
 					automsgs[i].active = (state == "on");
-					bot.fc_reply(msg, msg.get_user_cmd_cp() + ": "
+					bot.fc_reply(msg, msg.get_user_cmd() + ": "
 						+ "Message " + std::to_string(i)
 						+ " on " + server + " turned on.");
 					write_automsgs();
@@ -2222,7 +2222,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	}
 	else
 	{
-		return bot.cmd_error(msg, help(msg.get_user_cmd_cp()));
+		return bot.cmd_error(msg, help(msg.get_user_cmd()));
 	}
 	return true;
 }
@@ -2280,13 +2280,13 @@ bool RConicsIrcBotPlugin::rename(const message& msg)
 	if(!bot.extract_params(msg, {&server, &from, &to}))
 		return false;
 
-	if(!rcon_user_valid(msg.from_cp, server))
-		return bot.cmd_error(msg, msg.get_nick_cp() + " is not authorised for " + server + ".");
+	if(!rcon_user_valid(msg.prefix, server))
+		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised for " + server + ".");
 
 	lock_guard lock1(renames_mtx);
 	renames[server][from] = to;
 	lock_guard lock2(renames_subs_mtx);
-	renames_subs[server].insert(msg.to_cp); // fudge
+	renames_subs[server].insert(msg.get_to()); // fudge
 //	renames_subs[server].insert(msg);
 
 	return true;
@@ -2298,8 +2298,8 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 	if(!bot.extract_params(msg, {&server, &guid, &team}))
 		return false;
 
-	if(!rcon_user_valid(msg.from_cp, server))
-		return bot.cmd_error(msg, msg.get_nick_cp() + " is not authorised for " + server + ".");
+	if(!rcon_user_valid(msg.prefix, server))
+		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised for " + server + ".");
 
 	rcon_server_map& sm = get_rcon_server_map();
 	rcon_server_map::iterator s;
@@ -2353,10 +2353,10 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 	lock_guard lock2(reteams_subs_mtx);
 	if(info.team == ' ')
-		reteams_subs[server].erase(reteams_subs[server].find(msg.to_cp)); // fudge
+		reteams_subs[server].erase(reteams_subs[server].find(msg.get_to())); // fudge
 //		reteams_subs[server].erase(reteams_subs[server].find(msg));
 	else
-		reteams_subs[server].insert(msg.to_cp); // fudge
+		reteams_subs[server].insert(msg.get_to()); // fudge
 //		reteams_subs[server].insert(msg);
 
 	return true;
@@ -2366,7 +2366,7 @@ bool RConicsIrcBotPlugin::is_user_valid(const message& msg, const str& svar)
 {
 	bug_func();
 	for(const str& r: bot.get_vec(svar))
-		if(bot.preg_match(r, msg.get_userhost_cp()))
+		if(bot.preg_match(r, msg.get_userhost()))
 			return true;
 	return false;
 }
@@ -2378,14 +2378,14 @@ bool RConicsIrcBotPlugin::adminkill(const message& msg)
 
 	if(!is_user_valid(msg, RCON_ADMINKILL_USERS))
 	{
-		bot.fc_reply(msg, prompt + msg.get_nick_cp() + " is not authorised to use the adminkill feature.");
+		bot.fc_reply(msg, prompt + msg.get_nickname() + " is not authorised to use the adminkill feature.");
 		return false;
 	}
 
 	// !adminkill <server> <guid>+
 
 	str server, guid;
-	std::istringstream iss(msg.get_user_params_cp());
+	std::istringstream iss(msg.get_user_params());
 
 	rcon_server_map& sm = get_rcon_server_map();
 
@@ -2471,12 +2471,12 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 	// !rcon_stats <server> [echo] (on|off)
 
 	str server;
-	std::istringstream iss(msg.get_user_params_cp());
+	std::istringstream iss(msg.get_user_params());
 
 	if(!(iss >> server))
 		return bot.cmd_error(msg, "Expected server name.");
-	if(!rcon_user_valid(msg.from_cp, server))
-		return bot.cmd_error(msg, msg.get_nick_cp() + " is not authorised for " + server + ".");
+	if(!rcon_user_valid(msg.prefix, server))
+		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised for " + server + ".");
 
 	str cmd;
 	if(!(iss >> cmd))
@@ -2500,7 +2500,7 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 		if(cmd == "on")
 		{
 			lock_guard lock(stats_subs_mtx);
-			stats_subs.insert(msg.to_cp); // fudge
+			stats_subs.insert(msg.get_to()); // fudge
 			bot.fc_reply(msg, "Stats announcing will now be echoed to this channel.");
 //			stats_subs.insert(msg);
 //			bot.fc_reply(msg, "Stats announcing will now be echoed to this channel.");
@@ -2508,7 +2508,7 @@ bool RConicsIrcBotPlugin::rcon_stats(const message& msg)
 		else if(cmd == "off")
 		{
 			lock_guard lock(stats_subs_mtx);
-			stats_subs.erase(msg.to_cp); // fudge
+			stats_subs.erase(msg.get_to()); // fudge
 //			stats_subs.erase(msg);
 			bot.fc_reply(msg, "Stats announcing will no longer be echoed to this channel.");
 		}
@@ -2591,11 +2591,12 @@ bool RConicsIrcBotPlugin::rcon_short(const message& msg)
 
 
 	str server, params;
-	std::getline(std::istringstream(msg.get_user_params_cp()) >> server, params);
+	sgl(siss(msg.get_user_params()) >> server, params);
 
 	message m = msg;
-	m.text_cp = "!rcon " + server + " " + msg.get_user_cmd_cp() + " " + params;
-//	m.text = "!rcon " + msg.get_user_params() + " " + msg.get_user_cmd();
+//	m.text_cp = "!rcon " + server + " " + msg.get_user_cmd_cp() + " " + params;
+	m.params = " " + msg.get_chan() + " :!rcon " + server + " " + msg.get_user_cmd() + " " + params;
+
 	return rcon(m);
 }
 
@@ -2607,7 +2608,7 @@ bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
 	str name;
 	str_vec params;
 
-	std::istringstream iss(msg.get_user_params_cp());
+	std::istringstream iss(msg.get_user_params());
 	if(!(iss >> name))
 		return bot.cmd_error(msg, "Expected script name.", false);
 
