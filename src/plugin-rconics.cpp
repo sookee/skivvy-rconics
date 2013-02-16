@@ -129,6 +129,8 @@ const str RCONICS_DB_IP_DEFAULT = "rconics-db-ip.txt";
 const str RCONICS_DB_NOTE = "rconics.db.note.file";
 const str RCONICS_DB_NOTE_DEFAULT = "rconics-db-note.txt";
 
+const str AUTOVAR = "rconics.autovar";
+
 
 // alias: GUID, name
 // ip: GUID, IP
@@ -1085,7 +1087,7 @@ str RConicsIrcBotPlugin::var_sub(const str& s, const str& server)
 	return ret;
 }
 
-bool autoban_check(const str& server, const str& line, str& test)
+bool autoban_check(const str& server, const str& line, str& text)
 {
 	// goo {04:00,10:00} "ban text"
 	str srv, stime, etime, skip;
@@ -1115,7 +1117,42 @@ bool autoban_check(const str& server, const str& line, str& test)
 	if(now < stime || now > etime)
 		return false;
 
-	return ios::getstring(iss, test);
+	return ios::getstring(iss, text);
+}
+
+bool autotime_check(const str& server, const str& line, str& text, bool& active)
+{
+	bug_func();
+	// goo {04:00,10:00} "text"
+	str srv, stime, etime, skip;
+	std::istringstream iss(line);
+	iss >> srv;
+	if(srv != server)
+		return false;
+
+	sgl(iss, skip, '{');
+	sgl(iss, stime, ',');
+	sgl(iss, etime, '}');
+	sgl(iss, text);
+	trim(text);
+
+	if(!iss)
+		return false;
+
+	trim(stime);
+	trim(etime);
+
+	time_t t = std::time(0);
+	str now = std::ctime(&t); // now = "Www Mmm dd hh:mm:ss yyyy"
+
+	if(now.size() < 17)
+		return false;
+
+	now = now.substr(11, 5);
+
+	active = (now >= stime && now < etime);
+
+	return true;
 }
 
 bool autounban_check(const str& server, const str& line, str& ban)
@@ -1277,7 +1314,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	str_vec managed = bot.get_vec(RCON_MANAGED);
 	for(const str& server: managed)
 	{
-//		log("server: " << server);
+		log("managed server: " << server);
 
 //		if((s = sm.find(server)) == sm.cend())
 		if(!sm.count(server))
@@ -1298,6 +1335,14 @@ void RConicsIrcBotPlugin::regular_poll()
 		else
 			log_namelog(res);
 
+		if(bot.get("log.verbose", false))
+		{
+			str line;
+			siss iss(res);
+			while(sgl(iss, line))
+				log(line);
+		}
+
 		// We have two data streams to parse in order to get one whole data item
 		// for each player. So we need to record if the first parsing succeeded
 		// before attempting the second.
@@ -1309,6 +1354,14 @@ void RConicsIrcBotPlugin::regular_poll()
 		{
 			log("No response from rcon !listplayers on server: " << server);
 			continue;
+		}
+
+		if(bot.get("log.verbose", false))
+		{
+			str line;
+			siss iss(res);
+			while(sgl(iss, line))
+				log(line);
 		}
 
 		// !listplayers: 4 players connected:
@@ -1365,6 +1418,14 @@ void RConicsIrcBotPlugin::regular_poll()
 		{
 			log("No response from rcon status on server: " << server);
 			continue;
+		}
+
+		if(bot.get("log.verbose", false))
+		{
+			str line;
+			siss iss(res);
+			while(sgl(iss, line))
+				log(line);
 		}
 
 		// map: mlctf1beta
@@ -1498,6 +1559,60 @@ void RConicsIrcBotPlugin::regular_poll()
 					log("!ban  RESULT: " << res);
 					res = rcon("addip " + ip, sm.at(server));
 					log("addip RESULT: " << res);
+				}
+			}
+
+			// autovar
+
+			str text;
+			for(const str& line: bot.get_vec(AUTOVAR))
+			{
+				bool active = false;
+				if(!autotime_check(server, line, text, active))
+				{
+					log("ERROR: Bad autotime: " << line);
+					continue;
+				}
+				bug_var(active);
+				str var, active_val, inactive_val;
+				if(!(siss(text) >> var >> active_val >> inactive_val))
+				{
+					// zim {15:15,15:20} wibble 0 1
+					log("ERROR: Bad autovar: " << text);
+					continue;
+				}
+
+				bug_var(var);
+				bug_var(active_val);
+				bug_var(inactive_val);
+
+				if(active)
+				{
+					// turn it on
+					if(varmap[server][var]) // already active
+						continue;
+
+					str res;
+					log("AUTOVAR: Attempting to activate " << var << ": " << active_val);
+					if(net::rcon("rcon " + sm.at(server).pass + " set " + var + " " + active_val, res, sm.at(server).host, sm.at(server).port))
+					{
+						log("AUTOVAR: " << var << " has been activated");
+						varmap[server][var] = true;
+					}
+				}
+				else
+				{
+					//turn it off
+					if(!varmap[server][var]) // already inactive
+						continue;
+
+					str res;
+					log("AUTOVAR: Attempting to deactivate " << var << ": " << active_val);
+					if(net::rcon("rcon " + sm.at(server).pass + " set " + var + " " + inactive_val, res, sm.at(server).host, sm.at(server).port))
+					{
+						log("AUTOVAR: " << var << " has been deactivated");
+						varmap[server][var] = false;
+					}
 				}
 			}
 

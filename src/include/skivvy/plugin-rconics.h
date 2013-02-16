@@ -222,6 +222,11 @@ private:
 	typedef rcon_server_map::iterator server_map_iter;
 	typedef rcon_server_map::const_iterator rcon_server_map_citer;
 
+	typedef std::map<str, std::map<str, bool> > server_var_map;
+	typedef std::pair<const str, std::map<str, bool> > server_var_pair;
+
+	server_var_map varmap; // <server> -> {var -> <active>}
+
 	usermap& get_rcon_users();
 
 	rcon_user_map& get_rcon_user_map();
