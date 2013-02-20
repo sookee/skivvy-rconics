@@ -130,6 +130,7 @@ const str RCONICS_DB_NOTE = "rconics.db.note.file";
 const str RCONICS_DB_NOTE_DEFAULT = "rconics-db-note.txt";
 
 const str AUTOVAR = "rconics.autovar";
+const str AUTOCMD = "rconics.autocmd";
 
 
 // alias: GUID, name
@@ -1212,7 +1213,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			for(const str& chan: automsg_subs[amsg.server])
 			{
 				message msg;
-				msg.get_to() = chan; // fudge message for reply to correct channel
+				msg.params = chan; // fudge message for reply to correct channel
 				bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
 			}
 		}
@@ -1567,6 +1568,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			str text;
 			for(const str& line: bot.get_vec(AUTOVAR))
 			{
+				bug_var(line);
 				bool active = false;
 				if(!autotime_check(server, line, text, active))
 				{
@@ -1616,6 +1618,59 @@ void RConicsIrcBotPlugin::regular_poll()
 				}
 			}
 
+			// autocmd
+
+			for(const str& line: bot.get_vec(AUTOCMD))
+			{
+				bug_var(line);
+				bool active = false;
+				if(!autotime_check(server, line, text, active))
+				{
+					log("ERROR: Bad autotime: " << line);
+					continue;
+				}
+				bug_var(active);
+				str active_cmd, inactive_cmd;
+				if(!sgl(sgl(siss(text), active_cmd, ';'), inactive_cmd, ';'))
+				{
+					// zim {15:15,15:20} wibble 0 1
+					log("ERROR: Bad autocmd: " << text);
+					continue;
+				}
+
+				bug_var(active_cmd);
+				bug_var(inactive_cmd);
+
+				if(active)
+				{
+					// turn it on
+					if(varmap[server][line]) // already active
+						continue;
+
+					str res;
+					log("AUTOCMD: Attempting to activate: " << active_cmd);
+					if(net::rcon("rcon " + sm.at(server).pass + " " + active_cmd, res, sm.at(server).host, sm.at(server).port))
+					{
+						log("AUTOCMD: '" << active_cmd << "' has been activated");
+						varmap[server][line] = true;
+					}
+				}
+				else
+				{
+					//turn it off
+					if(!varmap[server][line]) // already inactive
+						continue;
+
+					str res;
+					log("AUTOCMD: Attempting to deactivate: " << active_cmd);
+					if(net::rcon("rcon " + sm.at(server).pass + " " + inactive_cmd, res, sm.at(server).host, sm.at(server).port))
+					{
+						log("AUTOCMD: '" << inactive_cmd << "' has been deactivated");
+						varmap[server][line] = false;
+					}
+				}
+			}
+
 			player_set_iter psi = curr[server].find(p);
 
 			if(psi == curr[server].end())
@@ -1638,7 +1693,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: renames_subs[server])
 				{
 					message msg;
-					msg.get_to() = chan; // fudge
+					msg.params = chan; // fudge
 					std::istringstream iss(trim(ret));
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
