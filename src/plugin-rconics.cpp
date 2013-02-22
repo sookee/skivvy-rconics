@@ -2868,7 +2868,8 @@ bool RConicsIrcBotPlugin::initialize()
 		"!whois"
 		, "!whois (GUID|IP|name) [+ip] [+loc[=(code|country|state|city|zip|lat|long)]] [+isp] [#n]"
 			"\n	 Find other known aliases for player with GUID, IP or name."
-			"\n  Add optional IP location (+ip) or location (+loc) or ISP (+isp) to the report."
+			"\n  Add optional IP (+ip) or location (+loc) or ISP (+isp) to the report."
+			"\n Location (+loc) can be augmented as +loc=<type> (code|country|state|zip|lat|long)"
 		, [&](const message& msg){ whois(msg); }
 	});
 	add
