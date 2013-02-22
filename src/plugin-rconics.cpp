@@ -1693,7 +1693,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: renames_subs[server])
 				{
 					message msg;
-					msg.params = chan; // fudge
+					msg.params = chan + ": dummy"; // fudge
 					std::istringstream iss(trim(ret));
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
