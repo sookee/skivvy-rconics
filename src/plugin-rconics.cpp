@@ -39,17 +39,14 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <sstream>
 #include <functional>
 #include <mutex>
-
 #include <cassert>
-
 #include <fstream>
 
-//#include <tr1/regex>
+#include <sookee/str.h>
 
 #include <skivvy/ios.h>
 #include <skivvy/irc.h>
 #include <skivvy/stl.h>
-#include <skivvy/str.h>
 #include <skivvy/ircbot.h>
 #include <skivvy/utils.h>
 #include <skivvy/logrep.h>
@@ -69,7 +66,7 @@ using namespace skivvy::irc;
 using namespace skivvy::types;
 using namespace skivvy::utils;
 using namespace skivvy::ircbot;
-using namespace skivvy::string;
+using namespace sookee::string;
 
 //namespace tr1 = std::tr1;
 
@@ -284,7 +281,7 @@ str RConicsIrcBotPlugin::do_rcon(const message& msg, str cmd, const str& host, s
 	std::ostringstream oss;
 
 	// Drop mega advertising
-	str lwr = lowercase(cmd);
+	str lwr = lower_copy(cmd);
 	if(lwr.find(" mega") != str::npos
 	|| lwr.find("mega ") != str::npos
 	|| lwr.find("teammega") != str::npos)
@@ -1075,7 +1072,7 @@ str RConicsIrcBotPlugin::var_sub(const str& s, const str& server)
 					lock_guard lock(db_mtx);
 					sifs ifs(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 					while(ifs >> r)
-						if(lowercase(r.guid) == lowercase(guid))
+						if(lower_copy(r.guid) == lower_copy(guid))
 							names.insert(ent(r.count, r.data));
 				}
 
@@ -1531,22 +1528,22 @@ void RConicsIrcBotPlugin::regular_poll()
 
 				for(const str& line: bot.get_vec(BAN_BY_LOC))
 					if(autoban_check(server, line, test))
-						if(lowercase((loc = get_loc(ip, "city"))).find(lowercase(test)) != str::npos)
+						if(lower_copy((loc = get_loc(ip, "city"))).find(lower_copy(test)) != str::npos)
 							reasons.push_back("AUTO-BAN BY LOC: " + loc);
 				for(const str& line: bot.get_vec(UNBAN_BY_LOC))
 					if(autounban_check(server, line, test))
-						if(lowercase((loc = get_loc(ip, "city"))).find(lowercase(test)) != str::npos)
+						if(lower_copy((loc = get_loc(ip, "city"))).find(lower_copy(test)) != str::npos)
 							unreasons.push_back("AUTO-BAN PROTECTION BY LOC: " + loc);
 
 				// AUTOBAN BY TIME AND ISP
 
 				for(const str& line: bot.get_vec(BAN_BY_ISP))
 					if(autoban_check(server, line, test))
-						if(lowercase((isp = get_isp(ip))).find(lowercase(test)) != str::npos)
+						if(lower_copy((isp = get_isp(ip))).find(lower_copy(test)) != str::npos)
 							reasons.push_back("AUTO-BAN BY ISP: " + isp);
 				for(const str& line: bot.get_vec(UNBAN_BY_ISP))
 					if(autounban_check(server, line, test))
-						if(lowercase((isp = get_isp(ip))).find(lowercase(test)) != str::npos)
+						if(lower_copy((isp = get_isp(ip))).find(lower_copy(test)) != str::npos)
 							unreasons.push_back("AUTO-BAN PROTECTION BY ISP: " + isp);
 
 				for(const str& reason: reasons)
@@ -1831,23 +1828,23 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 
 	db_rec r;
 
-	query = lowercase(query);
+	lower(query);
 
 	if(is_guid(query, 2))
 	{
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		while(ifs >> r)
-			if(exact && lowercase(r.guid) == query)
+			if(exact && lower_copy(r.guid) == query)
 				names[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lowercase(r.guid).find(query) != str::npos)
+			else if(!exact && lower_copy(r.guid).find(query) != str::npos)
 				names[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
-			if(exact && lowercase(r.guid) == query)
+			if(exact && lower_copy(r.guid) == query)
 				ips[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lowercase(r.guid).find(query) != str::npos)
+			else if(!exact && lower_copy(r.guid).find(query) != str::npos)
 				ips[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 	}
@@ -1879,7 +1876,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		while(ifs >> r)
 		{
 			++count;
-			str data = lowercase(adjust(r.data));
+			str data = lower_copy(adjust(r.data));
 			if(exact && data == query)
 			{
 				//bug("found: " << data << " at " << count);
@@ -2287,7 +2284,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		// !rconmsg <server> echo (on|off)
 		str state; // on | off
 		iss >> state;
-		state = lowercase(state);
+		state = lower_copy(state);
 		bug_var(state);
 		bug_var(do_automsg);
 
@@ -2336,7 +2333,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 
 		str state; // on | off
 		iss >> state;
-		state = lowercase(state);
+		state = lower_copy(state);
 		bug("state: " << state);
 
 		if(state != "on" && state != "off")
@@ -2481,7 +2478,7 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 		return false;
 	}
 
-	team = lowercase(team);
+	team = lower_copy(team);
 
 	reteam_info info;
 
@@ -2618,7 +2615,7 @@ bool RConicsIrcBotPlugin::adminkill(const message& msg)
 		str_set ips;
 		sifs ifs(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
-			if(lowercase(r.guid) == lowercase(guid))
+			if(lower_copy(r.guid) == lower_copy(guid))
 				ips.insert(r.data);
 
 		// Remove their !admin rights
