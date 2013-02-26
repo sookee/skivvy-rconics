@@ -41,6 +41,9 @@ http://www.gnu.org/licenses/gpl-2.0.html
 
 #include <sstream>
 
+#include <sookee/log.h>
+#include <sookee/bug.h>
+
 #include <skivvy/logrep.h>
 #include <skivvy/plugin-rconics-rcon.h>
 #include <skivvy/types.h>

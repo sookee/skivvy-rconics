@@ -51,6 +51,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/stl.h>
 #include <skivvy/str.h>
 #include <skivvy/ircbot.h>
+#include <skivvy/utils.h>
 #include <skivvy/logrep.h>
 #include <skivvy/network.h>
 #include <skivvy/plugin-rconics-rcon.h>
