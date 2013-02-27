@@ -1270,7 +1270,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: stats_subs)
 				{
 					message msg;
-					msg.get_to() = chan; // fudge mssage to reply to correct channel
+					msg.params = " " + chan + " :"; // fudge mssage to reply to correct channel
 					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
 				}
 
@@ -1691,7 +1691,7 @@ void RConicsIrcBotPlugin::regular_poll()
 				for(const str& chan: renames_subs[server])
 				{
 					message msg;
-					msg.params = chan + ": dummy"; // fudge
+					msg.params = " " + chan + " :"; // fudge
 					std::istringstream iss(trim(ret));
 					for(str line; std::getline(iss, line);)
 						bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
@@ -1725,7 +1725,7 @@ void RConicsIrcBotPlugin::regular_poll()
 					for(const str& chan: reteams_subs[server])
 					{
 						message msg;
-						msg.get_to() = chan; // fudge
+						msg.params = " " + chan + " :"; // fudge
 						std::istringstream iss(trim(ret));
 						for(str line; getline(iss, line);)
 							if(line.find("!putteam") != str::npos)
