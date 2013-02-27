@@ -1211,7 +1211,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			for(const str& chan: automsg_subs[amsg.server])
 			{
 				message msg;
-				msg.params = chan; // fudge message for reply to correct channel
+				msg.params = " " + chan + " :"; // fudge message for reply to correct channel
 				bot.fc_reply(msg, "{" + amsg.server + "} " + oa_to_IRC(trim(ret).c_str()));
 			}
 		}
