@@ -505,10 +505,12 @@ str::size_type get_last_field(const str& line, str& val, char delim = ' ')
 
 bool is_guid(const str& s, siz min = 8)
 {
+	bug_func();
+	bug_var(s);
+	bug_var(min);
 	assert(min <= 8);
 	return s.size() <= 8 && s.size() >= min
-//	&& (siz)std::count_if(s.begin(), s.end(), [](char c) { return isxdigit(c); }) == s.size();
-	&& stl::count_if(s, std::ptr_fun<int, int>(isxdigit)) == s.size();
+		&& stl::count_if(s, std::ptr_fun<int, int>(isxdigit)) == s.size();
 }
 
 bool is_ip(const str& s)
@@ -1313,7 +1315,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	str_vec managed = bot.get_vec(RCON_MANAGED);
 	for(const str& server: managed)
 	{
-		log("managed server: " << server);
+//		log("managed server: " << server);
 
 //		if((s = sm.find(server)) == sm.cend())
 		if(!sm.count(server))
@@ -1830,26 +1832,29 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 
 	lower(query);
 
-	if(is_guid(query, 2))
+//	if(is_guid(query, 2))
+	str guid = trim_copy(query, "(*)");
+	if(is_guid(guid, 3))
 	{
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		while(ifs >> r)
-			if(exact && lower_copy(r.guid) == query)
+			if(exact && lower_copy(r.guid) == guid)
 				names[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lower_copy(r.guid).find(query) != str::npos)
+			else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
 				names[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
 		while(ifs >> r)
-			if(exact && lower_copy(r.guid) == query)
+			if(exact && lower_copy(r.guid) == guid)
 				ips[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lower_copy(r.guid).find(query) != str::npos)
+			else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
 				ips[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 	}
 
-	if(is_ip(query))
+	str ip = trim_copy(query, "[]");
+	if(is_ip(ip))
 	{
 		//bug("IP Query: " << query);
 		lock_guard lock(db_mtx);
@@ -1857,7 +1862,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		while(ifs >> r)
 			if(exact && r.data == query)
 				ips[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && !r.data.find(query)) // starts with
+			else if(!exact && !r.data.find(ip)) // starts with
 				ips[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
@@ -1878,15 +1883,9 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 			++count;
 			str data = lower_copy(adjust(r.data));
 			if(exact && data == query)
-			{
-				//bug("found: " << data << " at " << count);
 				names[r.guid].insert(ent(r.count, r.data));
-			}
 			else if(!exact && data.find(query) != str::npos)
-			{
-				//bug("found: " << data << " at " << count);
 				names[r.guid].insert(ent(r.count, r.data));
-			}
 		}
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
