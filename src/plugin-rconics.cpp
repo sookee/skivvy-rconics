@@ -2031,6 +2031,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		str text;
 		if(!bot.extract_params(msg, {&guid, &cmd, &text}, true))
 			return false;
+		trim(guid, "(*)");
 
 		str g, note;
 		str_vec notes;
@@ -2056,6 +2057,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		str num, text;
 		if(!bot.extract_params(msg, {&guid, &cmd, &num, &text}, true))
 			return false;
+		trim(guid, "(*)");
 
 		siz n = 0;
 		if(!(std::istringstream(num) >> n))
@@ -2085,6 +2087,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		str num, text;
 		if(!bot.extract_params(msg, {&guid, &cmd, &num, &text}, true))
 			return false;
+		trim(guid, "(*)");
 
 		siz n = 0;
 		if(!(std::istringstream(num) >> n))
@@ -2120,6 +2123,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		str num;
 		if(!bot.extract_params(msg, {&guid, &cmd, &num}, true))
 			return false;
+		trim(guid, "(*)");
 
 		siz n = 0;
 		if(!(std::istringstream(num) >> n))
