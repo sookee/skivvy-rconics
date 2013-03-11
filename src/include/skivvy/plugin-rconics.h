@@ -382,6 +382,7 @@ private:
 	bool rconmsg(const message& msg);
 	bool rcon_stats(const message& msg);
 	bool whois(const message& msg);
+	siz count_notes(const str& guid);
 	bool notes(const message& msg);
 	bool rename(const message& msg);
 	bool reteam(const message& msg);

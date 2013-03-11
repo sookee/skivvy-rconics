@@ -1773,6 +1773,18 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 	return false;
 }
 
+siz RConicsIrcBotPlugin::count_notes(const str& guid)
+{
+	siz count = 0;
+	str g, note;
+
+	sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
+	while(sgl(ifs >> g >> std::ws, note))
+		if(g == guid)
+			++count;;
+	return count;
+}
+
 bool RConicsIrcBotPlugin::whois(const message& msg)
 {
 	BUG_COMMAND(msg);
@@ -1973,6 +1985,10 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 					oss << "]";
 				}
 
+				lock_guard lock(db_mtx);
+				if(siz n = count_notes(p.first))
+					oss << IRC_BOLD << IRC_COLOR << IRC_Red << " +" << n << IRC_NORMAL << " note" << (n>1?"s":"");
+
 				bot.fc_reply(msg, oss.str());
 			}
 			++count;
@@ -1997,8 +2013,15 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 	// !notes <GUID> (add <text> | mod <n> <text> | del <n> | list)
 
 	str guid, cmd;
-	if(!bot.extract_params(msg, {&guid, &cmd}, true))
-		return false;
+	if(!bot.extract_params(msg, {&guid, &cmd}, false))
+	{
+		cmd = "list";
+
+		if(!bot.extract_params(msg, {&guid}, true))
+			return false;
+	}
+
+	trim(guid, "(*)");
 
 	if(!is_guid(guid))
 		return bot.cmd_error(msg, prompt + "Invalid GUID: " + guid);
@@ -2126,7 +2149,7 @@ bool RConicsIrcBotPlugin::notes(const message& msg)
 		sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 		for(siz i = 0; std::getline(ifs >> g >> std::ws, note);)
 			if(g == guid)
-				bot.fc_reply(msg, prompt + " " + std::to_string(++i) + " " + note);
+				bot.fc_reply(msg, prompt + " " + std::to_string(++i) + ". " + note);
 		ifs.close();
 		bot.fc_reply(msg, prompt + "End of notes for: " + guid);
 	}
