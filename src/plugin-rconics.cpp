@@ -1707,22 +1707,32 @@ void RConicsIrcBotPlugin::regular_poll()
 			curr[server].insert(p);
 
 			// reteam: Force player to a given team
-			str_reteam_map_itr srmi = reteams[server].find(p.guid);
-			if(srmi != reteams[server].end())
+//			str_reteam_map_itr srmi = reteams[server].find(p.guid);
+//			if(srmi != reteams[server].end())
+
+			bug("RETEAM: checking: " << reteams[server].size());
+
+			for(str_reteam_map_itr srmi = reteams[server].begin(); srmi != reteams[server].end(); ++srmi)
+				bug("RETEAM: " << srmi->first);
+
+			if(reteams[server].count(p.guid))
 			{
-				if(!srmi->second.mapname.empty()
-				&& srmi->second.mapname != mapname)
+				log("rconics: RETEAM: " << p.guid);
+				reteam_info& info = reteams[server][p.guid];
+				if(!info.mapname.empty()
+				&& info.mapname != mapname)
 				{
-					reteams[server].erase(srmi);
+					reteams[server].erase(p.guid);
 				}
-				else if(std::time(0) - srmi->second.when > int(srmi->second.secs))
+				else if(std::time(0) - info.when > int(info.secs))
 				{
-					reteams[server].erase(srmi);
+					if(reteams[server].erase(p.guid))
+						log("rconics: RETEAM expired for: " << p.guid);
 				}
-				else if(p.team != 'S' && p.team != srmi->second.team)
+				else if(p.team != 'S' && p.team != info.team)
 				{
 					oss.str("");
-					oss << "!putteam " << p.num << ' ' << srmi->second.team;
+					oss << "!putteam " << p.num << ' ' << info.team;
 					str ret = rcon(oss.str(), sm.at(server));
 					for(const str& chan: reteams_subs[server])
 					{
@@ -2275,6 +2285,15 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	{
 		log("LIST");
 		log("automsgs.size(): " << automsgs.size());
+
+		bool color = false;
+		str flag;
+		if(iss >> flag && (flag == "+c" || flag == "+color" || flag == "+colour"))
+			color = true;
+
+		bug_var(flag);
+		bug_var(color);
+
 		siz i = 0;
 		lock_guard lock(automsgs_mtx);
 		log("automsgs.size(): " << automsgs.size());
@@ -2299,7 +2318,19 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					prefix = "/ ";
 				std::ostringstream oss;
 				oss << std::boolalpha;
-				oss << (i++) << ": " << prefix << amsg.server << " " << amsg.method << " " << amsg.repeat << " \"" << amsg.text << "\"";
+				oss << (i++) << ": " << prefix << amsg.server << " " << amsg.method << " " << amsg.repeat << " \"";
+
+				if(color)
+					oss << oa_to_IRC(amsg.text);
+				else
+					oss << amsg.text;
+
+				oss << "\"";
+
+//				str m = oss.str();
+//				if(color)
+//					m = oa_to_IRC(m);
+
 				bot.fc_reply(msg, oss.str());
 			}
 		}
@@ -2510,11 +2541,11 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 	info.team = ' '; // delete reteam entry
 	if(team == "r" || team == "red")
-		info.team = 'r';
+		info.team = 'R';
 	else if(team == "b" || team == "blue")
-		info.team = 'b';
+		info.team = 'B';
 	else if(team == "s" || team == "spec")
-		info.team = 's';
+		info.team = 'S';
 
 	str res = do_rcon(msg, "status", s->second);
 	if(!trim(res).empty())
@@ -2536,7 +2567,7 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 	lock_guard lock1(reteams_mtx);
 	if(info.team == ' ')
 	{
-		reteams[server].erase(reteams[server].find(guid));
+		if(reteams[server].erase(guid))
 		bot.fc_reply(msg, "Reteam removed for: " + guid);
 	}
 	else
@@ -2547,11 +2578,9 @@ bool RConicsIrcBotPlugin::reteam(const message& msg)
 
 	lock_guard lock2(reteams_subs_mtx);
 	if(info.team == ' ')
-		reteams_subs[server].erase(reteams_subs[server].find(msg.get_to())); // fudge
-//		reteams_subs[server].erase(reteams_subs[server].find(msg));
+		reteams_subs[server].erase(msg.get_to()); // fudge
 	else
 		reteams_subs[server].insert(msg.get_to()); // fudge
-//		reteams_subs[server].insert(msg);
 
 	return true;
 }
@@ -2811,7 +2840,7 @@ bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
 		params.push_back(param);
 
 	// load scipt
-	str file = bot.getf("rconics.scripts.dir", "rconics-scripts") + "/" + name + "rs";
+	str file = bot.getf("rconics.scripts.dir", "rconics-scripts") + "/" + name + ".rs";
 
 	std::ifstream ifs(file);
 	if(!ifs)
