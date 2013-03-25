@@ -1315,7 +1315,7 @@ void RConicsIrcBotPlugin::regular_poll()
 	str_vec managed = bot.get_vec(RCON_MANAGED);
 	for(const str& server: managed)
 	{
-//		log("managed server: " << server);
+//		bug_var(server);
 
 //		if((s = sm.find(server)) == sm.cend())
 		if(!sm.count(server))
@@ -1381,8 +1381,12 @@ void RConicsIrcBotPlugin::regular_poll()
 				continue;
 
 			std::istringstream iss(line);
-			if(!std::getline(std::getline(std::getline(iss >> p.num >> p.team, skip, '*'), p.guid, ')') >> std::ws, p.name))
+			if(!std::getline(std::getline(std::getline(iss >> p.num >> p.team >> p.admin >> std::ws, skip, '*'), p.guid, ')') >> std::ws, p.name))
 				continue;
+
+//			bug_var(p.name);
+//			bug_var(p.guid);
+//			bug_var(p.admin);
 
 			parsed = true;
 
@@ -1405,6 +1409,28 @@ void RConicsIrcBotPlugin::regular_poll()
 				if(trim(res).empty())
 					log("No response from rcon status on server: " << server);
 			}
+
+//			str s, g, n;
+//			siz l;
+//
+//			for(const str& admin: bot.get_vec("rconics.server.admin"))
+//			{
+//				siss iss(admin);
+//				if(!(iss >> s >> g >> l))
+//					continue;
+//
+//				str n;
+//				if(!sgl(iss, n))
+//					n.clear();
+//
+//				if(s != server || g != p.guid || l == p.admin)
+//					continue;
+//
+//				log("CHANGE ADMIN: " << p.name << " set to admin: " << l << " from " << p.admin);
+//				res = rcon("!setlevel " + std::to_string(p.num) + " " + std::to_string(l), sm.at(server));
+//				if(trim(res).empty())
+//					log("No response from rcon !setlevel on server: " << server);
+//			}
 		}
 
 		if(!parsed)
@@ -1703,6 +1729,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			p.guid = psi->guid;
 			p.team = psi->team;
+			p.admin = psi->admin;
 			curr[server].erase(psi);
 			curr[server].insert(p);
 
@@ -1710,7 +1737,7 @@ void RConicsIrcBotPlugin::regular_poll()
 //			str_reteam_map_itr srmi = reteams[server].find(p.guid);
 //			if(srmi != reteams[server].end())
 
-			bug("RETEAM: checking: " << reteams[server].size());
+			//bug("RETEAM: checking: " << reteams[server].size());
 
 			for(str_reteam_map_itr srmi = reteams[server].begin(); srmi != reteams[server].end(); ++srmi)
 				bug("RETEAM: " << srmi->first);
@@ -1743,6 +1770,64 @@ void RConicsIrcBotPlugin::regular_poll()
 							if(line.find("!putteam") != str::npos)
 								bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(line.c_str()));
 					}
+				}
+			}
+
+			// auto admin
+
+//			bug_var(server);
+//			bug_var(p.guid);
+//			bug_var(p.admin);
+//			bug_var(p.name);
+
+			str s, g, n;
+			siz l;
+
+
+			for(const str& admin: bot.get_vec("rconics.server.admin"))
+			{
+//				bug_var(admin);
+				siss iss(admin);
+				if(!(iss >> s >> g >> l))
+					continue;
+
+//				bug_var(s);
+//				bug_var(g);
+//				bug_var(l);
+
+				if(s != server || g != p.guid || l == p.admin)
+					continue;
+
+				str n;
+				if(!sgl(iss >> std::ws, n))
+					n.clear();
+
+				trim(n);
+
+				if(!n.empty())
+					n += "^7"; // the game adds this
+
+//				bug_var(n);
+
+				if(!n.empty() && n != p.name)
+				{
+					log("CHANGE NAME : " << p.guid << " from: " << p.name << " to: " << n);
+					res = rcon("!rename " + std::to_string(p.num) + " " + n, sm.at(server));
+					if(trim(res).empty())
+						log("No response from rcon !rename on server: " << server << " to: " << n);
+				}
+
+				log("CHANGE ADMIN: " << p.guid << " set to admin: " << l << " from " << p.admin);
+				res = rcon("!setlevel " + std::to_string(p.num) + " " + std::to_string(l), sm.at(server));
+				if(trim(res).empty())
+					log("No response from rcon !setlevel on server: " << server);
+
+				if(!n.empty() && n != p.name)
+				{
+					log("CHANGE NAME : " << p.guid << " from: " << n << " to: " << p.name);
+					res = rcon("!rename " + std::to_string(p.num) + " " + p.name, sm.at(server));
+					if(trim(res).empty())
+						log("No response from rcon !rename on server: " << server << " to: " << p.name);
 				}
 			}
 

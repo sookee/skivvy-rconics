@@ -293,6 +293,7 @@ private:
 	struct player
 	{
 		siz num; // game slot
+		siz admin; // admin level
 		str guid;
 		str name;
 		char team; // R|B|S
