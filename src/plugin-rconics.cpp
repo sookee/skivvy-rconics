@@ -68,14 +68,6 @@ using namespace skivvy::utils;
 using namespace skivvy::ircbot;
 using namespace sookee::string;
 
-//namespace tr1 = std::tr1;
-
-
-// rconics.user: <user>
-// rconics.user.name: <user> <name>
-// rconics.user.pass: <user> <pass>
-// rconics.user.preg: <user> <regex>
-
 const str K_ADMIN = "rconics.admin";
 const str USER = "rconics.user";
 const str USER_NAME = "rconics.user.name";
@@ -128,6 +120,7 @@ const str RCONICS_DB_NOTE = "rconics.db.note.file";
 const str RCONICS_DB_NOTE_DEFAULT = "rconics-db-note.txt";
 
 const str AUTOVAR = "rconics.autovar";
+const str AUTOVAR_GUID = "rconics.autovar.guid";
 const str AUTOCMD = "rconics.autocmd";
 
 
@@ -578,7 +571,7 @@ str adjust(const str& name)
 
 bool RConicsIrcBotPlugin::get_loc_map(const str& ip, location_map& m)
 {
-	bug_func();
+//	bug_func();
 	static const str_map itemmap =
 	{
 		{"code", "<tr><td width=200>My IP country code:</td><td>"}
@@ -963,7 +956,7 @@ void RConicsIrcBotPlugin::write_to_db(const str& db, const str& guid_in
 	ofs.close();
 }
 
-void log_namelog(const str& text)
+void log_namelog(const str& server, const str& text)
 {
 	// ^2|<^8MAD^1Kitty Too^7: ^2why no? ))
 	// ^30  (*2BC45233)  77.123.107.231^7 '^2BDSM^7'
@@ -1013,7 +1006,7 @@ void log_namelog(const str& text)
 		iss.clear();
 		iss.str(names);
 		while(std::getline(iss, skip, '\'') && std::getline(iss, name, '\''))
-			log("NAMELOG    : " << num << ' ' << guid << ' ' << ip << ' ' << name);
+			log("NAMELOG    : [" << server << "] " << num << ' ' << guid << ' ' << ip << ' ' << name);
 	}
 }
 
@@ -1315,9 +1308,21 @@ void RConicsIrcBotPlugin::regular_poll()
 	str_vec managed = bot.get_vec(RCON_MANAGED);
 	for(const str& server: managed)
 	{
-//		bug_var(server);
+		// IrcBot default
+		bool log_verbose = bot.get("log.verbose", false);
 
-//		if((s = sm.find(server)) == sm.cend())
+		// rconics override
+		if(bot.has("rconics.log.verbose"))
+		{
+			str text;
+			bool active = false;
+			if(autotime_check(server, bot.get("rconics.log.verbose"), text, active))
+				log_verbose = active;
+		}
+
+		if(log_verbose)
+			log("managed server: " << server);
+
 		if(!sm.count(server))
 		{
 			log("Managed server " << server << " has no details.");
@@ -1334,9 +1339,9 @@ void RConicsIrcBotPlugin::regular_poll()
 		if(trim(res).empty())
 			log("No response from rcon !namelog on server: " << server);
 		else
-			log_namelog(res);
+			log_namelog(server, res);
 
-		if(bot.get("log.verbose", false))
+		if(log_verbose)
 		{
 			str line;
 			siss iss(res);
@@ -1357,7 +1362,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			continue;
 		}
 
-		if(bot.get("log.verbose", false))
+		if(log_verbose)
 		{
 			str line;
 			siss iss(res);
@@ -1409,28 +1414,6 @@ void RConicsIrcBotPlugin::regular_poll()
 				if(trim(res).empty())
 					log("No response from rcon status on server: " << server);
 			}
-
-//			str s, g, n;
-//			siz l;
-//
-//			for(const str& admin: bot.get_vec("rconics.server.admin"))
-//			{
-//				siss iss(admin);
-//				if(!(iss >> s >> g >> l))
-//					continue;
-//
-//				str n;
-//				if(!sgl(iss, n))
-//					n.clear();
-//
-//				if(s != server || g != p.guid || l == p.admin)
-//					continue;
-//
-//				log("CHANGE ADMIN: " << p.name << " set to admin: " << l << " from " << p.admin);
-//				res = rcon("!setlevel " + std::to_string(p.num) + " " + std::to_string(l), sm.at(server));
-//				if(trim(res).empty())
-//					log("No response from rcon !setlevel on server: " << server);
-//			}
 		}
 
 		if(!parsed)
@@ -1447,7 +1430,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			continue;
 		}
 
-		if(bot.get("log.verbose", false))
+		if(log_verbose)
 		{
 			str line;
 			siss iss(res);
@@ -1774,7 +1757,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			}
 
 			// auto admin
-
+//			bug("== AUTO ADMIN: ==================================");
 //			bug_var(server);
 //			bug_var(p.guid);
 //			bug_var(p.admin);
@@ -1783,51 +1766,61 @@ void RConicsIrcBotPlugin::regular_poll()
 			str s, g, n;
 			siz l;
 
-
-			for(const str& admin: bot.get_vec("rconics.server.admin"))
+			static siz autoadmin_count = 10;
+			if(!(--autoadmin_count))
 			{
-//				bug_var(admin);
-				siss iss(admin);
-				if(!(iss >> s >> g >> l))
-					continue;
-
-//				bug_var(s);
-//				bug_var(g);
-//				bug_var(l);
-
-				if(s != server || g != p.guid || l == p.admin)
-					continue;
-
-				str n;
-				if(!sgl(iss >> std::ws, n))
-					n.clear();
-
-				trim(n);
-
-				if(!n.empty())
-					n += "^7"; // the game adds this
-
-//				bug_var(n);
-
-				if(!n.empty() && n != p.name)
+				autoadmin_count = 10;
+				for(const str& admin: bot.get_vec("rconics.server.admin"))
 				{
-					log("CHANGE NAME : " << p.guid << " from: " << p.name << " to: " << n);
-					res = rcon("!rename " + std::to_string(p.num) + " " + n, sm.at(server));
-					if(trim(res).empty())
-						log("No response from rcon !rename on server: " << server << " to: " << n);
-				}
+//					bug_var(admin);
+					siss iss(admin);
+					if(!(iss >> s >> g >> l))
+						continue;
 
-				log("CHANGE ADMIN: " << p.guid << " set to admin: " << l << " from " << p.admin);
-				res = rcon("!setlevel " + std::to_string(p.num) + " " + std::to_string(l), sm.at(server));
-				if(trim(res).empty())
-					log("No response from rcon !setlevel on server: " << server);
+//					bug_var(s);
+//					bug_var(g);
+//					bug_var(l);
 
-				if(!n.empty() && n != p.name)
-				{
-					log("CHANGE NAME : " << p.guid << " from: " << n << " to: " << p.name);
-					res = rcon("!rename " + std::to_string(p.num) + " " + p.name, sm.at(server));
+					if(s != server || g != p.guid || l == p.admin)
+						continue;
+
+					str n;
+					if(!sgl(iss >> std::ws, n))
+						n.clear();
+
+					trim(n);
+
+					if(!n.empty())
+						n += "^7"; // the game adds this
+
+	//				if(n.empty() && l == p.admin)
+	//					continue;
+	//
+	//				if(l == p.admin && n == p.name)
+	//					continue;
+
+//					bug_var(n);
+
+					if(!n.empty() && n != p.name)
+					{
+						log("CHANGE NAME : " << p.guid << " from: " << p.name << " to: " << n);
+						res = rcon("!rename " + std::to_string(p.num) + " " + n, sm.at(server));
+						if(trim(res).empty())
+							log("No response from rcon !rename on server: " << server << " to: " << n);
+					}
+
+					log("CHANGE ADMIN: " << p.guid << " set to admin: " << l << " from " << p.admin);
+					res = rcon("!setlevel " + std::to_string(p.num) + " " + std::to_string(l), sm.at(server));
 					if(trim(res).empty())
-						log("No response from rcon !rename on server: " << server << " to: " << p.name);
+						log("No response from rcon !setlevel on server: " << server);
+
+					if(!n.empty() && n != p.name)
+					{
+						log("CHANGE NAME : " << p.guid << " from: " << n << " to: " << p.name);
+						res = rcon("!rename " + std::to_string(p.num) + " " + p.name, sm.at(server));
+						if(trim(res).empty())
+							log("No response from rcon !rename on server: " << server << " to: " << p.name);
+					}
 				}
 			}
 
@@ -1945,18 +1938,25 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	{
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
-		while(ifs >> r)
-			if(exact && lower_copy(r.guid) == guid)
-				names[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
-				names[r.guid].insert(ent(r.count, r.data));
+		str line;
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+			{
+				if(exact && lower_copy(r.guid) == guid)
+					names[r.guid].insert(ent(r.count, r.data));
+				else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
+					names[r.guid].insert(ent(r.count, r.data));
+			}
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
-		while(ifs >> r)
-			if(exact && lower_copy(r.guid) == guid)
-				ips[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
-				ips[r.guid].insert(ent(r.count, r.data));
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+			{
+				if(exact && lower_copy(r.guid) == guid)
+					ips[r.guid].insert(ent(r.count, r.data));
+				else if(!exact && lower_copy(r.guid).find(guid) != str::npos)
+					ips[r.guid].insert(ent(r.count, r.data));
+			}
 		ifs.close();
 	}
 
@@ -1966,16 +1966,21 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		//bug("IP Query: " << query);
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
-		while(ifs >> r)
-			if(exact && r.data == query)
-				ips[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && !r.data.find(ip)) // starts with
-				ips[r.guid].insert(ent(r.count, r.data));
+		str line;
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+			{
+				if(exact && r.data == query)
+					ips[r.guid].insert(ent(r.count, r.data));
+				else if(!exact && !r.data.find(ip)) // starts with
+					ips[r.guid].insert(ent(r.count, r.data));
+			}
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
-		while(ifs >> r)
-			if(ips.find(r.guid) != ips.end())
-				names[r.guid].insert(ent(r.count, r.data));
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+				if(ips.find(r.guid) != ips.end())
+					names[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 		add_ip = true;
 	}
@@ -1985,20 +1990,23 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		siz count = 0;
-		while(ifs >> r)
-		{
-			++count;
-			str data = lower_copy(adjust(r.data));
-			if(exact && data == query)
-				names[r.guid].insert(ent(r.count, r.data));
-			else if(!exact && data.find(query) != str::npos)
-				names[r.guid].insert(ent(r.count, r.data));
-		}
+		str line;
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+			{
+				++count;
+				str data = lower_copy(adjust(r.data));
+				if(exact && data == query)
+					names[r.guid].insert(ent(r.count, r.data));
+				else if(!exact && data.find(query) != str::npos)
+					names[r.guid].insert(ent(r.count, r.data));
+			}
 		ifs.close();
 		ifs.open(bot.getf(RCONICS_DB_IP, RCONICS_DB_IP_DEFAULT));
-		while(ifs >> r)
-			if(names.find(r.guid) != names.end())
-				ips[r.guid].insert(ent(r.count, r.data));
+		while(sgl(ifs, line))
+			if(siss(line) >> r)
+				if(names.find(r.guid) != names.end())
+					ips[r.guid].insert(ent(r.count, r.data));
 		ifs.close();
 	}
 
@@ -2491,6 +2499,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 					if(!automsgs[i].active)
 						automsgs[i].when = std::time(0) - rand_int(0, automsgs[i].repeat);
 					automsgs[i].active = (state == "on");
+//					bot.fc_reply(msg, prompt + "Message #" + std::to_string(i) + " has been turned on for " + server + ".");
 					write_automsgs();
 				}
 				else if(!pos--)
@@ -2502,6 +2511,8 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 						+ "Message " + std::to_string(i)
 						+ " on " + server + " turned on.");
 					write_automsgs();
+					bot.fc_reply(msg, prompt + "Message #" + std::to_string(i) + " has been turned "
+						+ state + " for " + server + ".");
 					break;
 				}
 				if(state == "on")
@@ -2767,6 +2778,7 @@ bool RConicsIrcBotPlugin::adminkill(const message& msg)
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			ret = rcon("addip " + ip, s);
 		}
+		// TODO: remove their access to rconics ?
 	}
 
 	return true;
@@ -3061,9 +3073,12 @@ bool RConicsIrcBotPlugin::initialize()
 	add
 	({
 		"!rconmsg"
-		, "!rconmsg <server> add (cp|say|chat) <delay> - Add message <delay> = 1m (1minute) 1h (1 hour) 1d (1 day)"
-			"\n  !rconmsg <server> del <#n> - Delete specific message from <server>"
+		,   "\n!rconmsg (on|off) - turn the entire messaging system on or off"
+			"\n!rconmsg <server> (add|del|list|turn|echo):"
+			"\n  !rconmsg <server> add (cp|say|chat) <delay> - Add message <delay> = 1m (1minute) 1h (1 hour) 1d (1 day)"
+			"\n  !rconmsg <server> del <n> - Delete specific message from <server>"
 			"\n  !rconmsg <server> list - List messages for a given <server>"
+			"\n  !rconmsg <server> turn <n> (on|off) - turn individual messages on or off"
 			"\n  !rconmsg <server> echo (on|off) [#<n>] - Adjust echo for a specific (#<n>) or all messages for <server>."
 		, [&](const message& msg){ rconmsg(msg); }
 	});
