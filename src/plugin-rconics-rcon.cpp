@@ -55,7 +55,7 @@ using namespace skivvy::utils;
 using namespace skivvy::types;
 
 
-#define TIMEOUT 1000
+#define TIMEOUT 2000
 
 bool aocom(const str& cmd, str_vec& packets, const str& host, int port
 	, siz wait = TIMEOUT)
@@ -119,7 +119,9 @@ bool aocom(const str& cmd, str_vec& packets, const str& host, int port
 				log("socket timed out connecting to: " << host << ":" << port);
 				return false;
 			}
+			st_time_point wake = st_clk::now() + std::chrono::milliseconds(100);
 			std::this_thread::yield();
+			std::this_thread::sleep_until(wake);
 		}
 		if(n < 0)
 			log("cs recv: " << strerror(errno));

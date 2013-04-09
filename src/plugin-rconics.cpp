@@ -498,9 +498,9 @@ str::size_type get_last_field(const str& line, str& val, char delim = ' ')
 
 bool is_guid(const str& s, siz min = 8)
 {
-	bug_func();
-	bug_var(s);
-	bug_var(min);
+//	bug_func();
+//	bug_var(s);
+//	bug_var(min);
 	assert(min <= 8);
 	return s.size() <= 8 && s.size() >= min
 		&& stl::count_if(s, std::ptr_fun<int, int>(isxdigit)) == s.size();
