@@ -380,10 +380,12 @@ private:
 
 	bool showbans(const message& msg);
 	bool rcon(const message& msg);
+	bool rcon(const message& msg, str& response);
 	bool rconmsg(const message& msg);
 	bool rcon_stats(const message& msg);
 	bool whois(const message& msg);
 	siz count_notes(const str& guid);
+	bool get_notes(const str& guid, str_vec& notes);
 	bool notes(const message& msg);
 	bool rename(const message& msg);
 	bool reteam(const message& msg);
@@ -391,6 +393,12 @@ private:
 	bool alert(const message& msg);
 
 	bool rcon_short(const message& msg);//, const str& cmd);
+	/**
+	 * Admin !listplayers with formatted output and !notes flags
+	 * @param msg
+	 * @return
+	 */
+	bool listplayers(const message& msg);
 	bool rcon_exec(const message& msg);
 
 public:

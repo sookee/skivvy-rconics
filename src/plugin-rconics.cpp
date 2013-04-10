@@ -430,11 +430,8 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 {
 	BUG_COMMAND(msg);
 
-	str server, cmd;
-	std::getline(std::istringstream(msg.get_user_params()) >> server >> std::ws, cmd);
-
 	str res;
-	if(!do_checked_rcon(msg, trim(cmd), res))
+	if(!rcon(msg, res))
 		return false;
 
 	str line;
@@ -444,6 +441,21 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 		bug("line: " << line);
 		bot.fc_reply(msg, line);
 	}
+	return true;
+}
+
+bool RConicsIrcBotPlugin::rcon(const message& msg, str& response)
+{
+	BUG_COMMAND(msg);
+
+	str server, cmd;
+	std::getline(std::istringstream(msg.get_user_params()) >> server >> std::ws, cmd);
+
+	str res;
+	if(!do_checked_rcon(msg, trim(cmd), res))
+		return false;
+
+	response = res;
 	return true;
 }
 
@@ -1869,7 +1881,19 @@ siz RConicsIrcBotPlugin::count_notes(const str& guid)
 	sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
 	while(sgl(ifs >> g >> std::ws, note))
 		if(g == guid)
-			++count;;
+			++count;
+	return count;
+}
+
+bool RConicsIrcBotPlugin::get_notes(const str& guid, str_vec& notes)
+{
+	siz count = 0;
+	str g, note;
+
+	sifs ifs(bot.getf(RCONICS_DB_NOTE, RCONICS_DB_NOTE_DEFAULT));
+	while(sgl(ifs >> g >> std::ws, note))
+		if(g == guid)
+			{ ++count; notes.push_back(note); }
 	return count;
 }
 
@@ -2334,7 +2358,7 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	iss >> cmd;
 	bug_var(cmd);
 
-	if(cmd == "add") // !oarconmsg add google chat 1h "Wibble Wobble Woo"
+	if(cmd == "add") // !rconmsg add google chat 1h "Wibble Wobble Woo"
 	{
 		automsg amsg;
 
@@ -2342,11 +2366,6 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 
 		if(!ios::getstring(iss >> amsg.method >> amsg.repeat >> std::ws, amsg.text))
 			return bot.cmd_error(msg, prompt + "Expected: add <chat|cp> <repeat> \"<message>\"");
-
-		bug("amsg.server: " << amsg.server);
-		bug("amsg.method: " << amsg.method);
-		bug("repeat     : " << amsg.repeat);
-		bug("amsg.text  : " << amsg.text);
 
 		std::time(&amsg.when);
 		//amsg.owner = msg;
@@ -2361,7 +2380,6 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		siz pos;
 		if(!(iss >> pos))
 			return bot.cmd_error(msg, prompt + "Expected line number to delete.");
-		bug("pos: " << pos);
 
 		if(!(pos < automsgs.size()))
 			return bot.cmd_error(msg, prompt + "Number " + std::to_string(pos) + " out of range.");
@@ -2376,34 +2394,16 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 	}
 	else if(cmd == "list")
 	{
-		log("LIST");
-		log("automsgs.size(): " << automsgs.size());
-
 		bool color = false;
 		str flag;
 		if(iss >> flag && (flag == "+c" || flag == "+color" || flag == "+colour"))
 			color = true;
-
-		bug_var(flag);
-		bug_var(color);
 
 		siz i = 0;
 		lock_guard lock(automsgs_mtx);
 		log("automsgs.size(): " << automsgs.size());
 		for(const automsg& amsg: automsgs)
 		{
-			std::cout << "XXXXX: active: " << amsg.active << '\n';
-			//std::cout << "XXXXX: owner.line: " << amsg.owner.line << '\n';
-//			std::cout << "XXXXX: owner.from: " << amsg.owner.from << '\n';
-//			std::cout << "XXXXX: owner.cmd: " << amsg.owner.cmd << '\n';
-//			std::cout << "XXXXX: owner.params: " << amsg.owner.params << '\n';
-//			std::cout << "XXXXX: owner.to: " << amsg.owner.to << '\n';
-//			std::cout << "XXXXX: owner.text: " << amsg.owner.text << '\n';
-			std::cout << "XXXXX: server: " << amsg.server << '\n';
-			std::cout << "XXXXX: method: " << amsg.method << '\n';
-			std::cout << "XXXXX: repeat: " << amsg.repeat << '\n';
-			std::cout << "XXXXX: text: " << amsg.text << '\n';
-//			std::cout << amsg << '\n';
 			if(amsg.server == server)
 			{
 				str prefix = "x ";
@@ -2420,10 +2420,6 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 
 				oss << "\"";
 
-//				str m = oss.str();
-//				if(color)
-//					m = oa_to_IRC(m);
-
 				bot.fc_reply(msg, oss.str());
 			}
 		}
@@ -2435,20 +2431,15 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 		str state; // on | off
 		iss >> state;
 		state = lower_copy(state);
-		bug_var(state);
-		bug_var(do_automsg);
 
 		if(state == "on")
 		{
 			lock_guard lock(automsgs_mtx);
 			if(automsg_subs[server].count(msg.get_to())) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
-//			if(automsg_subs[server].count(msg))
-//				bot.fc_reply(msg, prompt + "Auto messages for " + server + " are already being echoed to this channel.");
 			else
 			{
 				automsg_subs[server].insert(msg.get_to()); // fudge
-//				automsg_subs[server].insert(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will now be echoed to this channel.");
 				save_automsg_state_to_store();
 			}
@@ -2458,12 +2449,9 @@ bool RConicsIrcBotPlugin::rconmsg(const message& msg)
 			lock_guard lock(automsgs_mtx);
 			if(!automsg_subs[server].count(msg.get_to())) // fudge
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
-//			if(!automsg_subs[server].count(msg))
-//				bot.fc_reply(msg, prompt + "Auto messages for " + server + " were not being echoed to this channel.");
 			else
 			{
 				automsg_subs[server].erase(msg.get_to()); // fudge
-//				automsg_subs[server].erase(msg);
 				bot.fc_reply(msg, prompt + "Auto messages for " + server + " will no longer be echoed to this channel.");
 				save_automsg_state_to_store();
 			}
@@ -2558,10 +2546,10 @@ bool RConicsIrcBotPlugin::save_automsg_state_to_store()
 
 bool RConicsIrcBotPlugin::load_automsg_state_to_store()
 {
-	bug_func();
-	bug_var(do_automsg);
+//	bug_func();
+//	bug_var(do_automsg);
 	do_automsg = store.get<bool>("automsg.do_automsg");//, do_automsg);
-	bug_var(do_automsg);
+//	bug_var(do_automsg);
 	do_automsg_for = store.get<str_set>("automsg.do_automsg_for", do_automsg_for);
 	automsg_subs = store.get<chan_set_map>("automsg.automsg_subs");
 	return true;
@@ -2890,7 +2878,7 @@ struct rcon_script
 
 bool RConicsIrcBotPlugin::rcon_short(const message& msg)
 {
-	BUG_COMMAND(msg);
+//	BUG_COMMAND(msg);
 
 //	---> bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
 //	-----------------------------------------------------
@@ -2918,6 +2906,112 @@ bool RConicsIrcBotPlugin::rcon_short(const message& msg)
 	m.params = " " + msg.get_chan() + " :!rcon " + server + " " + msg.get_user_cmd() + " " + params;
 
 	return rcon(m);
+}
+
+bool RConicsIrcBotPlugin::listplayers(const message& msg)
+{
+	BUG_COMMAND(msg);
+
+//	---> bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
+//	-----------------------------------------------------
+//	                 from: SooKee!~SooKee@SooKee.users.quakenet.org
+//	                  cmd: PRIVMSG
+//	               params: #skivvy
+//	                   to: #skivvy
+//	                 text: !listplayers zim
+//	msg.from_channel()   : true
+//	msg.get_sender()     : SooKee
+//	msg.get_user_cmd()   : !listplayers
+//	msg.get_user_params(): zim
+//	msg.reply_to()       : #skivvy
+//	-----------------------------------------------------
+//	<--- bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
+
+	str server, params;
+	sgl(siss(msg.get_user_params()) >> server, params);
+
+	message m = msg;
+	m.params = " " + msg.get_chan() + " :!rcon " + server + " " + msg.get_user_cmd() + " " + params;
+
+	str res;
+	if(!rcon(m, res))
+		return false;
+
+	// !listplayers: 7 players connected:
+	//  0 R 0   Unknown Player (*)   Angelyss
+	//  2 B 0   Unknown Player (*)   Sergei
+	//  3 S 5  Server Operator (*AC0CB71B)   Pete the Pest (a.k.a. Zim-Zim-Zim)
+	//  4 R 0   Unknown Player (*83CE3386)   NNS
+	//  5 B 5  Server Operator (*0BDDB5A5)   noSnd (a.k.a. L!ve*w!ng x)
+	//  6 S 5  Server Operator (*E20DDC17)   RED
+	//  7 S 0   Unknown Player (*70E4046F)   1
+
+	bool do_bots = false; // TODO: implement this flag
+	bool do_notes = true; // TODO: implement this flag
+
+	siss iss(trim(res));
+	str line;
+	sgl(iss, line); // skip first line
+	while(sgl(iss, line))
+	{
+		bug_var(line);
+		str pre, guid, aft;
+		sgl(sgl(sgl(siss(line), pre, '*'), guid, ')'), aft);
+		if(!do_bots && trim(guid).empty())
+			continue;
+		bug_var(pre);
+		bug_var(guid);
+		bug_var(aft);
+
+		str_vec notes;
+		get_notes(guid, notes);
+
+		str hud = IRC_COLOR + IRC_Yellow + "[ ]";
+		if(siz n = notes.size())
+			hud = IRC_COLOR + IRC_Yellow + "[" + IRC_COLOR + IRC_Red + std::to_string(n)
+				+ IRC_COLOR + IRC_Yellow + "]";
+
+		siz adnum;
+		str num, team, admin, skip;
+		if(!(siss(pre) >> num >> team >> adnum))
+		{
+			log("rconics: !listplayers PARSE ERROR: " << line);
+			return false;
+		}
+
+		static const str_vec adnums =
+		{
+			"00Unknown", "03Regular", "05Team Manager", "02Junior", "08Senior", "04Operator"
+		};
+
+		admin = "<error>";
+		if(adnum < 6)
+			admin = adnums[adnum];
+
+		if(admin.size() < 16)
+			admin.append(16 - admin.size(), ' ');
+
+		if(team == "R")
+			team = IRC_COLOR + IRC_Red + " RED";
+		else if(team == "B")
+			team = IRC_COLOR + IRC_Navy_Blue + "BLUE";
+		else if(team == "S")
+			team = IRC_COLOR + IRC_Green + "SPEC";
+		else
+			team = IRC_COLOR + IRC_Light_Gray + team;
+
+		soss oss;
+		oss << hud << " " << IRC_COLOR << IRC_White << guid;
+		oss << " " << team << " " << IRC_COLOR << IRC_Royal_Blue << admin;
+		oss << " " << IRC_COLOR << IRC_White << trim(aft);
+		bot.fc_reply(msg, oss.str());
+		if(do_notes)
+			for(const str& note: notes)
+				bot.fc_reply(msg, "  : " + note);
+	}
+	bot.fc_reply(msg, "end of list");
+
+	return true;
 }
 
 bool RConicsIrcBotPlugin::rcon_exec(const message& msg)
@@ -3032,7 +3126,7 @@ bool RConicsIrcBotPlugin::initialize()
 	({
 		"!listplayers"
 		, "!listplayers <server>."
-		, [&](const message& msg){ rcon_short(msg); }//, "!listplayers"); }
+		, [&](const message& msg){ listplayers(msg); }//, "!listplayers"); }
 	});
 	add
 	({
