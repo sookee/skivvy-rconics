@@ -289,9 +289,10 @@ private:
 	str do_rcon(const message& msg, str cmd, const rcon_server& s);
 
 	// managed servers
-
+public:
 	struct player
 	{
+		bool bot = false;
 		siz num; // game slot
 		siz admin; // admin level
 		str guid;
@@ -300,15 +301,61 @@ private:
 		siz score;
 		siz ping;
 		siz count;
+		str ip;
 
 		player(): num(0), score(0), ping(0), count(0) {}
 
+		void clear()
+		{
+			bot = false;
+			num = admin = score = ping = count = 0;
+			guid = name = ip = "";
+			team = ' ';
+		}
+
 		bool operator<(const player& p) const { return this->num < p.num; }
+		bool operator==(const player& p) const { return this->num == p.num; }
 	};
 
+	typedef std::function<bool(const player&, const player&)> player_func;
+
+	player_func compare_admin = [](const player& p1, const player& p2)
+	{
+		return p1.admin > p2.admin;
+	};
+	player_func compare_name = [](const player& p1, const player& p2)
+	{
+		return p1.name < p2.name;
+	};
+	player_func compare_team = [](const player& p1, const player& p2)
+	{
+		static std::map<char, siz> map =
+		{
+			{'R', 3}, {'B', 2}, {'S', 1}, {'C', 0}
+		};
+		return map[p1.team] > map[p2.team];
+	};
+	player_func compare_score = [](const player& p1, const player& p2)
+	{
+		return p1.score > p2.score;
+	};
+	player_func compare_ping = [](const player& p1, const player& p2)
+	{
+		return p1.ping < p2.ping;
+	};
+	player_func compare_ip = [](const player& p1, const player& p2)
+	{
+		return p1.ip < p2.ip;
+	};
+
+private:
 	typedef std::set<player> player_set;
 	typedef player_set::iterator player_set_iter;
 	typedef player_set::const_iterator player_set_citer;
+
+	typedef std::vector<player> player_vec;
+	typedef player_vec::iterator player_vec_iter;
+	typedef player_vec::const_iterator player_vec_citer;
 
 	typedef std::map<const str, player_set> player_map;
 	typedef std::pair<const str, player_set> player_pair;
@@ -377,6 +424,8 @@ private:
 	 * Do permission checks on user before executing rcon
 	 */
 	bool do_checked_rcon(const message& msg, const str& cmd, str& res);
+
+	bool get_player_info(const str& server, player_vec& players, bool do_bots = false);
 
 	bool showbans(const message& msg);
 	bool rcon(const message& msg);

@@ -273,16 +273,6 @@ str RConicsIrcBotPlugin::do_rcon(const message& msg, str cmd, const str& host, s
 	str res;
 	std::ostringstream oss;
 
-	// Drop mega advertising
-	str lwr = lower_copy(cmd);
-	if(lwr.find(" mega") != str::npos
-	|| lwr.find("mega ") != str::npos
-	|| lwr.find("teammega") != str::npos)
-	{
-		log("MEGA advert eradicated: " << cmd);
-		return "";
-	}
-
 	const str bot_name = bot.get(RCON_BOT_NAME, RCON_BOT_NAME_DEFAULT);
 
 	if(!cmd.find("say_team"))
@@ -326,7 +316,6 @@ bool RConicsIrcBotPlugin::do_checked_rcon(const message& msg, const str& cmd, st
 	{
 		lock_guard lock(rconlog_mtx);
 		std::ofstream ofs(bot.getf(RCON_LOG_FILE, RCON_LOG_FILE_DEFAULT), std::ios::app);
-		//ofs << msg << '\n';
 		ofs << get_stamp() << " " << msg.get_to() << " " << msg.prefix << " " << cmd << '\n';
 	}
 	res = do_rcon(msg, cmd, s->second);
@@ -1170,6 +1159,135 @@ bool autounban_check(const str& server, const str& line, str& ban)
 		return false;
 
 	return ios::getstring(iss, ban);
+}
+
+bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players, bool do_bots)
+{
+	player p;
+	const rcon_server_map& sm = get_rcon_server_map();
+
+	// We have two data streams to parse in order to get one whole data item
+	// for each player. So we need to record if the first parsing succeeded
+	// before attempting the second.
+	bool parsed = false;
+
+	str res = rcon("!listplayers", sm.at(server));
+
+	if(trim(res).empty())
+	{
+		log("No response from rcon !listplayers on server: " << server);
+		return false;
+	}
+
+	// !listplayers: 4 players connected:
+	//  0 R 0   Unknown Player (*01505619)   Excaliber
+	//  1 S 5  Server Operator (*1DE6454E)   *m*^Zimmer106
+	//  4 B 0   Unknown Player (*3840871C)   z
+	//  8 S 0   Unknown Player (*0AC40FCD)   Bacon Strips
+
+	siss iss(res);
+	str line, skip;
+
+	while(std::getline(iss, line) && !trim(line).empty())
+	{
+		if(line[0] == '!')
+			continue;
+
+		p.clear();
+
+		std::istringstream iss(line);
+		if(!std::getline(std::getline(std::getline(iss >> p.num >> p.team >> p.admin >> std::ws, skip, '*'), p.guid, ')') >> std::ws, p.name))
+			continue;
+
+		parsed = true;
+
+		if(trim(p.guid).empty())
+			p.bot = true;
+
+		if(!do_bots && p.bot)
+			continue;
+
+		players.push_back(p);
+	}
+
+	if(!parsed)
+	{
+		log("Error parsing rcon !listplayers.");
+		log(res);
+		return false;;
+	}
+
+	res = rcon("status", sm.at(server));
+	if(trim(res).empty())
+	{
+		log("No response from rcon status on server: " << server);
+		return false;
+	}
+
+	// map: mlctf1beta
+	// num score ping name            lastmsg address               qport rate
+	// --- ----- ---- --------------- ------- --------------------- ----- -----
+	//   0     0   48 ^1S^2oo^3K^5ee^7       0 81.109.248.108        15232 25000
+	//   1     0    0 Kyonshi^7            50 bot                   64050 16384
+	iss.clear();
+	iss.str(res);
+
+	str prev_line[2]; // TODO: DEBUG LINE
+	while(std::getline(iss, line) && !trim(line).empty())
+	{
+		str skip, ip;
+
+		siz pos = get_last_field(line, skip);
+		while(pos != str::npos && line[pos] == ' ') --pos;
+		if(pos != str::npos)
+			pos = get_last_field(line.substr(0, pos + 1), skip);
+		while(pos != str::npos && line[pos] == ' ') --pos;
+		if(pos != str::npos)
+			pos = get_last_field(line.substr(0, pos + 1), ip);
+		while(pos != str::npos && line[pos] == ' ') --pos;
+		if(pos != str::npos)
+			pos = get_last_field(line.substr(0, pos + 1), skip);
+		while(pos != str::npos && line[pos] == ' ') --pos;
+		std::istringstream iss(line.substr(0, pos + 1));
+
+		if(!(iss >> p.num >> p.score >> p.ping).ignore())
+			continue;
+//			iss.ignore(1);
+
+		if(ip != "bot" && !is_ip(ip))
+		{
+			log("IP PARSE ERROR: " << prev_line[0]);
+			log("IP PARSE ERROR: " << prev_line[1]);
+			log("IP PARSE ERROR: " << line);
+			continue;
+		}
+
+		prev_line[0] = prev_line[1];
+		prev_line[1] = line;
+
+		str name; // can be empty, if so keep name from !listplayers
+		if(std::getline(iss, name) && !name.empty() && name != "^7")
+			p.name = name;
+
+		// find player from previous parsing
+		player_vec_iter pvi = std::find(players.begin(), players.end(), p);
+//		player_set_iter psi = players.find(p);
+
+		if(pvi != players.end())
+		{
+			if(!do_bots && ip == "bot")
+				players.erase(pvi);
+			else
+			{
+				pvi->name = p.name;
+				pvi->score = p.score;
+				pvi->ping = p.ping;
+				if(is_ip(ip))
+					pvi->ip = ip;
+			}
+		}
+	}
+	return true;
 }
 
 void RConicsIrcBotPlugin::regular_poll()
@@ -2878,138 +2996,130 @@ struct rcon_script
 
 bool RConicsIrcBotPlugin::rcon_short(const message& msg)
 {
-//	BUG_COMMAND(msg);
-
-//	---> bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
-//	-----------------------------------------------------
-//	                 from: SooKee!~SooKee@SooKee.users.quakenet.org
-//	                  cmd: PRIVMSG
-//	               params: #skivvy
-//	                   to: #skivvy
-//	                 text: !listplayers zim
-//	msg.from_channel()   : true
-//	msg.get_sender()     : SooKee
-//	msg.get_user_cmd()   : !listplayers
-//	msg.get_user_params(): zim
-//	msg.reply_to()       : #skivvy
-//	-----------------------------------------------------
-//	<--- bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
-
-
-
-
 	str server, params;
 	sgl(siss(msg.get_user_params()) >> server, params);
 
 	message m = msg;
-//	m.text_cp = "!rcon " + server + " " + msg.get_user_cmd_cp() + " " + params;
 	m.params = " " + msg.get_chan() + " :!rcon " + server + " " + msg.get_user_cmd() + " " + params;
-
 	return rcon(m);
 }
 
 bool RConicsIrcBotPlugin::listplayers(const message& msg)
 {
-	BUG_COMMAND(msg);
-
-//	---> bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
-//	-----------------------------------------------------
-//	                 from: SooKee!~SooKee@SooKee.users.quakenet.org
-//	                  cmd: PRIVMSG
-//	               params: #skivvy
-//	                   to: #skivvy
-//	                 text: !listplayers zim
-//	msg.from_channel()   : true
-//	msg.get_sender()     : SooKee
-//	msg.get_user_cmd()   : !listplayers
-//	msg.get_user_params(): zim
-//	msg.reply_to()       : #skivvy
-//	-----------------------------------------------------
-//	<--- bool skivvy::ircbot::RConicsIrcBotPlugin::rcon_short(const skivvy::ircbot::message&, const str&) [0]{10: 0xbf9160cc}
-
 	str server, params;
 	sgl(siss(msg.get_user_params()) >> server, params);
 
-	message m = msg;
-	m.params = " " + msg.get_chan() + " :!rcon " + server + " " + msg.get_user_cmd() + " " + params;
+	player_vec players;
 
-	str res;
-	if(!rcon(m, res))
+	if(!get_player_info(server, players, true))
 		return false;
 
-	// !listplayers: 7 players connected:
-	//  0 R 0   Unknown Player (*)   Angelyss
-	//  2 B 0   Unknown Player (*)   Sergei
-	//  3 S 5  Server Operator (*AC0CB71B)   Pete the Pest (a.k.a. Zim-Zim-Zim)
-	//  4 R 0   Unknown Player (*83CE3386)   NNS
-	//  5 B 5  Server Operator (*0BDDB5A5)   noSnd (a.k.a. L!ve*w!ng x)
-	//  6 S 5  Server Operator (*E20DDC17)   RED
-	//  7 S 0   Unknown Player (*70E4046F)   1
+	bool do_ips = false;
+	bool do_bots = false;
+	bool do_notes = false;
+	bool do_scores = false;
 
-	bool do_bots = false; // TODO: implement this flag
-	bool do_notes = true; // TODO: implement this flag
-
-	siss iss(trim(res));
-	str line;
-	sgl(iss, line); // skip first line
-	while(sgl(iss, line))
+	str param;
+	siss iss("+s team +s admin " + params);
+	while(iss >> param)
 	{
-		bug_var(line);
-		str pre, guid, aft;
-		sgl(sgl(sgl(siss(line), pre, '*'), guid, ')'), aft);
-		if(!do_bots && trim(guid).empty())
+		if(param == "+b" || param == "+bots")
+			do_bots = true;
+		else if(param == "+n" || param == "+notes")
+			do_notes = true;
+		else if(param == "+ip")
+			do_ips = true;
+		else if(param == "+score")
+			do_scores = true;
+		else if(param == "+s" || param == "+sort")
+		{
+			str type = "team";
+			if(!(iss >> param))
+				bot.fc_reply(msg, "Expected sort method: team|score|ip");
+			else
+				type = param;
+
+			if(type == "team")
+				std::stable_sort(players.begin(), players.end(), compare_team);
+			else if(type == "admin")
+				std::stable_sort(players.begin(), players.end(), compare_admin);
+			else if(type == "score")
+				std::stable_sort(players.begin(), players.end(), compare_score);
+			else if(type == "ip")
+				std::stable_sort(players.begin(), players.end(), compare_ip);
+			else
+				bot.fc_reply(msg, "Unknown sort criteria: " + type);
+		}
+	}
+
+	bot.fc_reply(msg, str("Listing ") + std::to_string(players.size()) + " players:");
+
+	for(const player& p: players)
+	{
+		if(!do_bots && p.bot)
 			continue;
-		bug_var(pre);
-		bug_var(guid);
-		bug_var(aft);
 
 		str_vec notes;
-		get_notes(guid, notes);
+		get_notes(p.guid, notes);
 
 		str hud = IRC_COLOR + IRC_Yellow + "[ ]";
 		if(siz n = notes.size())
 			hud = IRC_COLOR + IRC_Yellow + "[" + IRC_COLOR + IRC_Red + std::to_string(n)
 				+ IRC_COLOR + IRC_Yellow + "]";
 
-		siz adnum;
-		str num, team, admin, skip;
-		if(!(siss(pre) >> num >> team >> adnum))
-		{
-			log("rconics: !listplayers PARSE ERROR: " << line);
-			return false;
-		}
-
 		static const str_vec adnums =
 		{
-			"00Unknown", "03Regular", "05Team Manager", "02Junior", "08Senior", "04Operator"
+			"00player", "03regular", "05admin", "02junior", "08senior", "04operator"
 		};
 
-		admin = "<error>";
-		if(adnum < 6)
-			admin = adnums[adnum];
+		str admin = "<error>";
+		if(p.admin < 6)
+			admin = adnums[p.admin];
 
-		if(admin.size() < 16)
-			admin.append(16 - admin.size(), ' ');
+		if(admin.size() < 11)
+			admin.append(11 - admin.size(), ' ');
 
-		if(team == "R")
-			team = IRC_COLOR + IRC_Red + " RED";
-		else if(team == "B")
-			team = IRC_COLOR + IRC_Navy_Blue + "BLUE";
-		else if(team == "S")
-			team = IRC_COLOR + IRC_Green + "SPEC";
+		str team;
+		if(p.team == 'R')
+			team = IRC_COLOR + IRC_Red + p.team;
+		else if(p.team == 'B')
+			team = IRC_COLOR + IRC_Navy_Blue + p.team;
+		else if(p.team == 'S')
+			team = IRC_COLOR + IRC_Green + p.team;
 		else
-			team = IRC_COLOR + IRC_Light_Gray + team;
+			team = IRC_COLOR + IRC_Light_Gray + p.team;
+
+		str ip;
+		if(do_ips)
+		{
+			ip = " " + p.ip;
+			if(ip.size() < 16)
+				ip += str(16 - ip.size(), ' ');
+		}
+
+		str score;
+		if(do_scores)
+		{
+			score = std::to_string(p.score);
+			if(score.size() < 3)
+				score = str(3 - score.size(), ' ') + score;
+			score = "[" + score + "] ";
+		}
+
+		str guid = p.guid;
+		if(p.bot)
+			guid = str(8, ' ');
 
 		soss oss;
-		oss << hud << " " << IRC_COLOR << IRC_White << guid;
+		oss << hud << IRC_COLOR << IRC_Olive << ip << " " << IRC_COLOR << IRC_White << guid;
 		oss << " " << team << " " << IRC_COLOR << IRC_Royal_Blue << admin;
-		oss << " " << IRC_COLOR << IRC_White << trim(aft);
+		oss << " " << IRC_COLOR << IRC_White << score << oa_to_IRC(p.name);
 		bot.fc_reply(msg, oss.str());
 		if(do_notes)
 			for(const str& note: notes)
 				bot.fc_reply(msg, "  : " + note);
 	}
-	bot.fc_reply(msg, "end of list");
+	bot.fc_reply(msg, "End of list");
 
 	return true;
 }
@@ -3125,7 +3235,7 @@ bool RConicsIrcBotPlugin::initialize()
 	add
 	({
 		"!listplayers"
-		, "!listplayers <server>."
+		, "!listplayers <server> ?(+b|+bots) ?(+n|+notes) ?(+score) ?(+ip) ?((+s|+sort) ('name'|''ip'|'score'|'team'|''))"
 		, [&](const message& msg){ listplayers(msg); }//, "!listplayers"); }
 	});
 	add
