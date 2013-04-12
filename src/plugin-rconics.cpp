@@ -1161,7 +1161,7 @@ bool autounban_check(const str& server, const str& line, str& ban)
 	return ios::getstring(iss, ban);
 }
 
-bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players, bool do_bots)
+bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players, str& mapname, bool do_bots)
 {
 	player p;
 	const rcon_server_map& sm = get_rcon_server_map();
@@ -1231,6 +1231,10 @@ bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players
 	//   1     0    0 Kyonshi^7            50 bot                   64050 16384
 	iss.clear();
 	iss.str(res);
+
+	while(std::getline(iss, line) && !trim(line).empty() && line[0] != '-')
+		if(!line.find("map:") && line.size() > 5)
+			mapname = line.substr(5);
 
 	str prev_line[2]; // TODO: DEBUG LINE
 	while(std::getline(iss, line) && !trim(line).empty())
@@ -2164,6 +2168,7 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	if(((chunk - 1) * 10) > size)
 		return bot.cmd_error(msg, "Batch number too high.");
 
+	bot.fc_reply(msg, prompt + "Please remember to keep this information private:");
 	bot.fc_reply(msg, prompt + "Listing #" + std::to_string(chunk)
 		+ " of " + std::to_string((size + 9)/10)
 		+ " (from " + std::to_string(start + 1) + " to "
@@ -3009,13 +3014,15 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 	str server, params;
 	sgl(siss(msg.get_user_params()) >> server, params);
 
+	str mapname;
 	player_vec players;
 
-	if(!get_player_info(server, players, true))
+	if(!get_player_info(server, players, mapname, true))
 		return false;
 
 	bool do_ips = false;
 	bool do_bots = false;
+	bool do_ping = false;
 	bool do_notes = false;
 	bool do_scores = false;
 
@@ -3027,6 +3034,8 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 			do_bots = true;
 		else if(param == "+n" || param == "+notes")
 			do_notes = true;
+		else if(param == "+p" || param == "+ping")
+			do_ping = true;
 		else if(param == "+ip")
 			do_ips = true;
 		else if(param == "+score")
@@ -3047,6 +3056,8 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 				std::stable_sort(players.begin(), players.end(), compare_score);
 			else if(type == "ip")
 				std::stable_sort(players.begin(), players.end(), compare_ip);
+			else if(type == "ping")
+				std::stable_sort(players.begin(), players.end(), compare_ping);
 			else
 				bot.fc_reply(msg, "Unknown sort criteria: " + type);
 		}
@@ -3056,7 +3067,7 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 	if(!do_bots)
 		size = std::count_if(players.begin(), players.end(), [](const player& p){ return !p.bot; });
 
-	bot.fc_reply(msg, str("Listing ") + std::to_string(size) + " players:");
+	bot.fc_reply(msg, str("Listing ") + std::to_string(size) + " players on: " + "03" + mapname);
 
 	for(const player& p: players)
 	{
@@ -3101,6 +3112,15 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 				ip += str(16 - ip.size(), ' ');
 		}
 
+		str ping;
+		if(do_ping)
+		{
+			ping = std::to_string(p.ping);
+			if(ping.size() < 3)
+				ping = str(3 - ping.size(), ' ') + ping;
+			ping = oa_to_IRC("^7(^2" + ping + "^7) ");
+		}
+
 		str score;
 		if(do_scores)
 		{
@@ -3114,12 +3134,12 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 		if(p.bot)
 			guid = str(8, ' ');
 
-		str slot = oa_to_IRC("^1[^7" + std::to_string(p.num) + "^1]^7 ");
+		str slot = oa_to_IRC("^1[^7" + str(p.num<10?" ":"") + std::to_string(p.num) + "^1]^7 ");
 
 		soss oss;
 		oss << hud << IRC_COLOR << IRC_Olive << ip << " " << IRC_COLOR << IRC_White << guid;
 		oss << " " << team << " " << IRC_COLOR << IRC_Royal_Blue << admin;
-		oss << " " << IRC_COLOR << IRC_White << score << slot << oa_to_IRC(p.name);
+		oss << " " << IRC_COLOR << IRC_White << score << slot << ping << oa_to_IRC(p.name);
 		bot.fc_reply(msg, oss.str());
 		if(do_notes)
 			for(const str& note: notes)
@@ -3241,7 +3261,7 @@ bool RConicsIrcBotPlugin::initialize()
 	add
 	({
 		"!listplayers"
-		, "!listplayers <server> ?(+b|+bots) ?(+n|+notes) ?(+score) ?(+ip) ?((+s|+sort) ('name'|''ip'|'score'|'team'|''))"
+		, "!listplayers <server> ?(+b|+bots) ?(+n|+notes) ?(+p|+ping) ?(+score) ?(+ip) ?((+s|+sort) ('name'|''ip'|'score'|'team'|'ping'))"
 		, [&](const message& msg){ listplayers(msg); }//, "!listplayers"); }
 	});
 	add

@@ -341,7 +341,7 @@ public:
 	};
 	player_func compare_ping = [](const player& p1, const player& p2)
 	{
-		return p1.ping < p2.ping;
+		return p1.ping > p2.ping;
 	};
 	player_func compare_ip = [](const player& p1, const player& p2)
 	{
@@ -425,7 +425,7 @@ private:
 	 */
 	bool do_checked_rcon(const message& msg, const str& cmd, str& res);
 
-	bool get_player_info(const str& server, player_vec& players, bool do_bots = false);
+	bool get_player_info(const str& server, player_vec& players, str& mapname, bool do_bots = false);
 
 	bool showbans(const message& msg);
 	bool rcon(const message& msg);
