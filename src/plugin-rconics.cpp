@@ -3052,7 +3052,11 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 		}
 	}
 
-	bot.fc_reply(msg, str("Listing ") + std::to_string(players.size()) + " players:");
+	siz size = players.size();
+	if(!do_bots)
+		size = std::count_if(players.begin(), players.end(), [](const player& p){ return !p.bot; });
+
+	bot.fc_reply(msg, str("Listing ") + std::to_string(size) + " players:");
 
 	for(const player& p: players)
 	{
@@ -3110,10 +3114,12 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 		if(p.bot)
 			guid = str(8, ' ');
 
+		str slot = oa_to_IRC("^1[^7" + std::to_string(p.num) + "^1]^7 ");
+
 		soss oss;
 		oss << hud << IRC_COLOR << IRC_Olive << ip << " " << IRC_COLOR << IRC_White << guid;
 		oss << " " << team << " " << IRC_COLOR << IRC_Royal_Blue << admin;
-		oss << " " << IRC_COLOR << IRC_White << score << oa_to_IRC(p.name);
+		oss << " " << IRC_COLOR << IRC_White << score << slot << oa_to_IRC(p.name);
 		bot.fc_reply(msg, oss.str());
 		if(do_notes)
 			for(const str& note: notes)
