@@ -321,7 +321,7 @@ public:
 
 	player_func compare_admin = [](const player& p1, const player& p2)
 	{
-		return p1.admin > p2.admin;
+		return p1.admin < p2.admin;
 	};
 	player_func compare_name = [](const player& p1, const player& p2)
 	{
@@ -333,19 +333,47 @@ public:
 		{
 			{'R', 3}, {'B', 2}, {'S', 1}, {'C', 0}
 		};
-		return map[p1.team] > map[p2.team];
+		return map[p1.team] < map[p2.team];
 	};
 	player_func compare_score = [](const player& p1, const player& p2)
 	{
-		return p1.score > p2.score;
+		return p1.score < p2.score;
 	};
 	player_func compare_ping = [](const player& p1, const player& p2)
 	{
-		return p1.ping > p2.ping;
+		return p1.ping < p2.ping;
 	};
 	player_func compare_ip = [](const player& p1, const player& p2)
 	{
 		return p1.ip < p2.ip;
+	};
+	player_func ncompare_admin = [](const player& p1, const player& p2)
+	{
+		return p1.admin > p2.admin;
+	};
+	player_func ncompare_name = [](const player& p1, const player& p2)
+	{
+		return p1.name > p2.name;
+	};
+	player_func ncompare_team = [](const player& p1, const player& p2)
+	{
+		static std::map<char, siz> map =
+		{
+			{'R', 3}, {'B', 2}, {'S', 1}, {'C', 0}
+		};
+		return map[p1.team] > map[p2.team];
+	};
+	player_func ncompare_score = [](const player& p1, const player& p2)
+	{
+		return p1.score > p2.score;
+	};
+	player_func ncompare_ping = [](const player& p1, const player& p2)
+	{
+		return p1.ping > p2.ping;
+	};
+	player_func ncompare_ip = [](const player& p1, const player& p2)
+	{
+		return p1.ip > p2.ip;
 	};
 
 private:
