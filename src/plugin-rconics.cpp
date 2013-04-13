@@ -3079,15 +3079,15 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 			sort_type += sort_sep + (sign?"+s ":"-s ") + type;
 			sort_sep = " ";
 
-			if(sort_type == "team")
+			if(type == "team")
 				std::stable_sort(players.begin(), players.end(), sign?compare_team:ncompare_team);
-			else if(sort_type == "admin")
+			else if(type == "admin")
 				std::stable_sort(players.begin(), players.end(), sign?compare_admin:ncompare_admin);
-			else if(sort_type == "score")
+			else if(type == "score")
 				std::stable_sort(players.begin(), players.end(), sign?compare_score:ncompare_score);
-			else if(sort_type == "ip")
+			else if(type == "ip")
 				std::stable_sort(players.begin(), players.end(), sign?compare_ip:ncompare_ip);
-			else if(sort_type == "ping")
+			else if(type == "ping")
 				std::stable_sort(players.begin(), players.end(), sign?compare_ping:ncompare_ping);
 			else
 				bot.fc_reply(msg, "Unknown sort criteria: " + type);
