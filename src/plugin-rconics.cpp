@@ -3026,17 +3026,25 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 	bool do_notes = false;
 	bool do_scores = false;
 	int set_defaults = 0; // +ve = set, -ve = clear 0 = no action
-	str sort_type = "+s team +s admin";
+	str_vec sort_types;// = "+s team +s admin";
+	sort_types.push_back("+team");
+	sort_types.push_back("+admin");
 
 	if(store.has("defaults.listplayers"))
 	{
-		str defaults = store.get("defaults.listplayers");
-		sgl(siss(defaults) >> do_ips >> do_bots >> do_ping >> do_notes >> do_scores >> std::ws, sort_type);
+		siss iss(store.get("defaults.listplayers"));
+		iss >> do_ips >> do_bots >> do_ping >> do_notes >> do_scores;
+		sort_types.clear();
+		str type;
+		while(iss >> type)
+			sort_types.push_back(type);
 	}
+
+	bool replace_sort = true;;
 
 	str sort_sep;
 	str param;
-	siss iss(sort_type + " " + params);
+	siss iss(params);
 	while(iss >> param)
 	{
 		if(param.size() < 2)
@@ -3070,27 +3078,50 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 			do_scores = sign;
 		else if(param == "s" || param == "sort")
 		{
+			if(replace_sort)
+			{
+				sort_types.clear();
+				replace_sort = false;
+			}
 			str type;
 			if(!(iss >> param))
 				bot.fc_reply(msg, "Expected sort method: team|score|ip");
 			else
 				type = param;
 
-			sort_type += sort_sep + (sign?"+s ":"-s ") + type;
-			sort_sep = " ";
+			type = (sign?"+":"-") + type;
+			if(std::find(sort_types.begin(), sort_types.end(), type) == sort_types.end())
+				sort_types.push_back(type);
+		}
+	}
 
-			if(type == "team")
-				std::stable_sort(players.begin(), players.end(), sign?compare_team:ncompare_team);
-			else if(type == "admin")
-				std::stable_sort(players.begin(), players.end(), sign?compare_admin:ncompare_admin);
-			else if(type == "score")
-				std::stable_sort(players.begin(), players.end(), sign?compare_score:ncompare_score);
-			else if(type == "ip")
-				std::stable_sort(players.begin(), players.end(), sign?compare_ip:ncompare_ip);
-			else if(type == "ping")
-				std::stable_sort(players.begin(), players.end(), sign?compare_ping:ncompare_ping);
-			else
-				bot.fc_reply(msg, "Unknown sort criteria: " + type);
+	siz adv = 1;
+	for(str_vec_itr t = sort_types.begin(); t != sort_types.end(); t += adv)
+	{
+		if(t->size() < 2)
+			continue;
+
+		str type = *t;
+		bool sign = type[0] == '+' ? true : false;
+		type = type.substr(1);
+
+		adv = 1;
+
+		if(type == "team")
+			std::stable_sort(players.begin(), players.end(), sign?compare_team:ncompare_team);
+		else if(type == "admin")
+			std::stable_sort(players.begin(), players.end(), sign?compare_admin:ncompare_admin);
+		else if(type == "score")
+			std::stable_sort(players.begin(), players.end(), sign?compare_score:ncompare_score);
+		else if(type == "ip")
+			std::stable_sort(players.begin(), players.end(), sign?compare_ip:ncompare_ip);
+		else if(type == "ping")
+			std::stable_sort(players.begin(), players.end(), sign?compare_ping:ncompare_ping);
+		else
+		{
+			bot.fc_reply(msg, "Unknown sort criteria: " + type);
+			t = sort_types.erase(t);
+			adv = 0;
 		}
 	}
 
@@ -3098,8 +3129,13 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 	{
 		soss oss;
 		if(set_defaults > 0)
+		{
 			oss << do_ips << ' ' << do_bots << ' ' << do_ping
-				<< ' ' << do_notes << ' ' << do_scores << ' ' << sort_type;
+				<< ' ' << do_notes << ' ' << do_scores;
+			for(str type: sort_types)
+				oss << ' ' << type;
+		}
+		bug("rconics: !listplayers: new defaults: " << oss.str());
 		store.set("defaults.listplayers", oss.str());
 	}
 
