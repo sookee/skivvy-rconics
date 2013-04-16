@@ -1254,9 +1254,15 @@ bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players
 		while(pos != str::npos && line[pos] == ' ') --pos;
 		std::istringstream iss(line.substr(0, pos + 1));
 
-		if(!(iss >> p.num >> p.score >> p.ping).ignore())
+		p.clear();
+		if(!(iss >> p.num))
 			continue;
-//			iss.ignore(1);
+
+		// find player from previous parsing
+		player_vec_iter pvi = std::find(players.begin(), players.end(), p);
+
+		if(pvi == players.end())
+			continue;
 
 		if(ip != "bot" && !is_ip(ip))
 		{
@@ -1266,30 +1272,23 @@ bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players
 			continue;
 		}
 
+		if(!do_bots && ip == "bot")
+		{
+			players.erase(pvi);
+			continue;
+		}
+
+		pvi->ip = ip;
+
+		if(!(iss >> pvi->score >> pvi->ping).ignore())
+			continue;
+
 		prev_line[0] = prev_line[1];
 		prev_line[1] = line;
 
 		str name; // can be empty, if so keep name from !listplayers
 		if(std::getline(iss, name) && !name.empty() && name != "^7")
-			p.name = name;
-
-		// find player from previous parsing
-		player_vec_iter pvi = std::find(players.begin(), players.end(), p);
-//		player_set_iter psi = players.find(p);
-
-		if(pvi != players.end())
-		{
-			if(!do_bots && ip == "bot")
-				players.erase(pvi);
-			else
-			{
-				pvi->name = p.name;
-				pvi->score = p.score;
-				pvi->ping = p.ping;
-				if(is_ip(ip))
-					pvi->ip = ip;
-			}
-		}
+			pvi->name = name;
 	}
 	return true;
 }
