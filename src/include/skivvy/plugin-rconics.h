@@ -32,19 +32,21 @@ http://www.gnu.org/licenses/gpl-2.0.html
 '-----------------------------------------------------------------*/
 
 #include <skivvy/ircbot.h>
+#include <skivvy/types.h>
 
 #include <ctime>
 #include <utility>
 #include <chrono>
 
 // RPC
-#include <skivvy/plugin-oastats.h>
+//#include <skivvy/plugin-oastats.h>
 #include <skivvy/store.h>
 
 namespace skivvy { namespace rconics {
 
 using namespace skivvy;
 using namespace skivvy::utils;
+using namespace skivvy::types;
 using namespace skivvy::ircbot;
 
 struct automsg;
@@ -444,7 +446,7 @@ private:
 	str_set do_adminkill; // server's undergoing adminkill process
 
 	// RPC clients
-	bool rpc_get_oatop(const str& params, stats_vector& v);
+	//bool rpc_get_oatop(const str& params, stats_vector& v);
 
 	// Bot Commands
 

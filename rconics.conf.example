@@ -41,8 +41,8 @@ rconics.server.down.retry: 1h
 
 rconics.server: goo <server ip>:<port> <rconpassword>
 rconics.managed: goo // rconics tracks players
-rconics.user: goo ~SooKee@SooKee.users.quakenet.org // user may use !rcon on this server
-rconics.user: goo <another user>
+rconics.rcon.user: goo ~SooKee@SooKee.users.quakenet.org // user may use !rcon on this server
+rconics.rcon.user: goo <another user>
 
 // outright immediate bans (no unban protection)
 #rconics.autoban.guid: goo 8B714F00

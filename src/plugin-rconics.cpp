@@ -43,6 +43,7 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <fstream>
 
 #include <sookee/str.h>
+#include <sookee/types.h>
 
 #include <skivvy/ios.h>
 #include <skivvy/irc.h>
@@ -52,9 +53,10 @@ http://www.gnu.org/licenses/gpl-2.0.html
 #include <skivvy/logrep.h>
 #include <skivvy/network.h>
 #include <skivvy/plugin-rconics-rcon.h>
-#include <skivvy/plugin-oastats.h>
+//#include <skivvy/plugin-oastats.h>
 
 #include <skivvy/socketstream.h>
+#include <skivvy/message.h>
 
 namespace skivvy { namespace rconics {
 
@@ -63,7 +65,7 @@ PLUGIN_INFO("rconics", "OA rcon utils", "0.2");
 
 using namespace skivvy;
 using namespace skivvy::irc;
-using namespace skivvy::types;
+using namespace sookee::types;
 using namespace skivvy::utils;
 using namespace skivvy::ircbot;
 using namespace sookee::string;
@@ -118,6 +120,8 @@ const str RCONICS_DB_IP = "rconics.db.ip.file";
 const str RCONICS_DB_IP_DEFAULT = "rconics-db-ip.txt";
 const str RCONICS_DB_NOTE = "rconics.db.note.file";
 const str RCONICS_DB_NOTE_DEFAULT = "rconics-db-note.txt";
+const str RCONICS_DB_TEMP = "rconics.db.temp.file";
+const str RCONICS_DB_TEMP_DEFAULT = "rconics-db-tmp.txt";
 
 const str AUTOVAR = "rconics.autovar";
 const str AUTOVAR_GUID = "rconics.autovar.guid";
@@ -427,7 +431,7 @@ bool RConicsIrcBotPlugin::rcon(const message& msg)
 	std::istringstream iss(trim(res));
 	while(std::getline(iss, line))
 	{
-		bug("line: " << line);
+		//bug("line: " << line);
 		bot.fc_reply(msg, line);
 	}
 	return true;
@@ -470,7 +474,7 @@ void RConicsIrcBotPlugin::read_automsgs()
 	str line;
 	while(sgl(ifs, line))
 	{
-		bug_var(line);
+		//bug_var(line);
 		siss iss(line);
 		if(deserialize(iss, amg))
 			automsgs.push_back(amg);
@@ -895,8 +899,8 @@ void RConicsIrcBotPlugin::write_to_db(const str& db, const str& guid_in
 	, const str& data, DB_SORT sort)
 {
 	// TODO: use standard variables "data_dir" etc...
-	str db_file = "rconics-db-" + db + ".txt";
-	str tmp_file = "rconics-db-tmp.txt";
+	str db_file = bot.getf("", "rconics-db-" + db + ".txt");
+	str tmp_file = bot.getf(RCONICS_DB_TEMP, RCONICS_DB_TEMP_DEFAULT);
 
 	if(db == "name")
 		db_file = bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT);
@@ -1345,71 +1349,71 @@ void RConicsIrcBotPlugin::regular_poll()
 		}
 	}
 
-	siz ival = bot.get(RCON_STATS_INTERVAL, RCON_STATS_INTERVAL_DEFAULT);
+	//siz ival = bot.get(RCON_STATS_INTERVAL, RCON_STATS_INTERVAL_DEFAULT);
 	//bug_var(do_stats.count(s.first));
 	// every ival minutes
-	if(!do_stats.empty() && polltime(poll::STATS, std::chrono::minutes(ival)) && bot.has_plugin("oastats"))
-	{
-		//bug("Have OA Stats Reporter");
-		for(const str& server: do_stats)
-		{
-			log("\tserver: " << server);
-			if(!sm.count(server))
-			{
-				log("Server info missing for stats: " + server + ".");
-				continue;
-			}
-			static std::mutex mtx;
-			static stats_vector v;
-
-			if(v.empty())
-			{
-				lock_guard lock(mtx);
-				if(v.empty())
-					if(!rpc_get_oatop("", v))
-						log("rpc_get_oatop() error");
-
-				std::sort(v.begin(), v.end(), [&](const keystats& ks1, const keystats& ks2)
-				{
-					return ks1.rank < ks2.rank;
-				});
-
-				if(v.size() > 20)
-					v.erase(v.begin() + 20, v.end());
-			}
-
-			siz max = v.size() > 20 ? 20 : v.size();
-
-			if(!v.empty())
-			{
-				siz i = rand_int(0, max - 1);
-
-				oss.str("");
-				oss.precision(1);
-				oss << std::fixed;
-				oss << "chat ^7#" << v[i].rank << (v[i].rank < 10 ? " " : "");
-				oss << " ^2Kil ^7" << v[i].kd;
-				oss << " ^5Cap ^7" << v[i].cd;
-				oss << " ^61v1 ^7" << int(v[i].pw + 0.5);
-				oss << " ^3All ^7" << v[i].overall;
-				oss << " " << v[i].name;
-				str ret = rcon(oss.str(), sm.at(server));
-
-				for(const str& chan: stats_subs)
-				{
-					message msg;
-					msg.params = " " + chan + " :"; // fudge mssage to reply to correct channel
-					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
-				}
-
-//				for(const message& msg: stats_subs)
+//	if(!do_stats.empty() && polltime(poll::STATS, std::chrono::minutes(ival)) && bot.has_plugin("oastats"))
+//	{
+//		//bug("Have OA Stats Reporter");
+//		for(const str& server: do_stats)
+//		{
+//			log("\tserver: " << server);
+//			if(!sm.count(server))
+//			{
+//				log("Server info missing for stats: " + server + ".");
+//				continue;
+//			}
+//			static std::mutex mtx;
+//			static stats_vector v;
+//
+//			if(v.empty())
+//			{
+//				lock_guard lock(mtx);
+//				if(v.empty())
+//					if(!rpc_get_oatop("", v))
+//						log("rpc_get_oatop() error");
+//
+//				std::sort(v.begin(), v.end(), [&](const keystats& ks1, const keystats& ks2)
+//				{
+//					return ks1.rank < ks2.rank;
+//				});
+//
+//				if(v.size() > 20)
+//					v.erase(v.begin() + 20, v.end());
+//			}
+//
+//			siz max = v.size() > 20 ? 20 : v.size();
+//
+//			if(!v.empty())
+//			{
+//				siz i = rand_int(0, max - 1);
+//
+//				oss.str("");
+//				oss.precision(1);
+//				oss << std::fixed;
+//				oss << "chat ^7#" << v[i].rank << (v[i].rank < 10 ? " " : "");
+//				oss << " ^2Kil ^7" << v[i].kd;
+//				oss << " ^5Cap ^7" << v[i].cd;
+//				oss << " ^61v1 ^7" << int(v[i].pw + 0.5);
+//				oss << " ^3All ^7" << v[i].overall;
+//				oss << " " << v[i].name;
+//				str ret = rcon(oss.str(), sm.at(server));
+//
+//				for(const str& chan: stats_subs)
+//				{
+//					message msg;
+//					msg.params = " " + chan + " :"; // fudge mssage to reply to correct channel
 //					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
-
-				//bug("STATS ANNOUNCE: " << oss.str());
-				v.erase(v.begin() + i);
-			}
-		}
-	}
+//				}
+//
+////				for(const message& msg: stats_subs)
+////					bot.fc_reply(msg, "{" + server + "} " + oa_to_IRC(trim(ret).c_str()));
+//
+//				//bug("STATS ANNOUNCE: " << oss.str());
+//				v.erase(v.begin() + i);
+//			}
+//		}
+//	}
 
 	//return;
 
@@ -1710,7 +1714,7 @@ void RConicsIrcBotPlugin::regular_poll()
 			str text;
 			for(const str& line: bot.get_vec(AUTOVAR))
 			{
-				bug_var(line);
+				//bug_var(line);
 				bool active = false;
 				if(!autotime_check(server, line, text, active))
 				{
@@ -1764,7 +1768,7 @@ void RConicsIrcBotPlugin::regular_poll()
 
 			for(const str& line: bot.get_vec(AUTOCMD))
 			{
-				bug_var(line);
+				//bug_var(line);
 				bool active = false;
 				if(!autotime_check(server, line, text, active))
 				{
@@ -1980,9 +1984,9 @@ void RConicsIrcBotPlugin::regular_poll()
 	}
 }
 
-bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
-{
-	bug_func();
+//bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
+//{
+//	bug_func();
 //
 //	IrcBotPluginHandle<OAStatsIrcBotPlugin> ph
 //		= bot.get_plugin_handle<OAStatsIrcBotPlugin>("oastats");
@@ -1990,9 +1994,9 @@ bool RConicsIrcBotPlugin::rpc_get_oatop(const str& params, stats_vector& v)
 //	if(ph)
 //		return ph->get_oatop(params, v);
 //
-	log("Plugin oastats not found.");
-	return false;
-}
+//	log("Plugin oastats not found.");
+//	return false;
+//}
 
 siz RConicsIrcBotPlugin::count_notes(const str& guid)
 {
@@ -2029,7 +2033,9 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		+ IRC_COLOR + IRC_Black + ": " + IRC_NORMAL;
 
 	if(!is_user_valid(msg, WHOIS_USER))
+	{
 		return bot.cmd_error(msg, msg.get_nickname() + " is not authorised to use whois database.");
+	}
 
 	bool exact = false;
 	bool add_loc = false;
@@ -2037,15 +2043,21 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	bool add_isp = false;
 	str add_loc_type = "code";
 
+	bug("A");
 	siz chunk = 1;
 	std::istringstream iss(msg.get_user_params());
+
+	bug("B");
 
 	str query;
 	ios::getstring(iss, query);
 
+	bug("C");
+
 	str param;
 	while(iss >> param)
 	{
+		bug("D");
 		if(param == "+x")
 			exact = true;
 		else if(param == "+ip")
@@ -2062,12 +2074,22 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 		else if(!param.empty() && param[0] == '#')
 			std::istringstream(param.substr(1)) >> chunk;
 		else if(!param.empty())
+		{
+			bug("E");
+			bug_msg(msg);
+			bug_var(msg.get_user_cmd());
 			return bot.fc_reply_help(msg, help(msg.get_user_cmd())
 				, "04" + msg.get_user_cmd() + ": 01");
+		}
 	}
 
+	bug("F");
+
 	if(!chunk)
+	{
+		bug("G");
 		return bot.fc_reply_help(msg, prompt + "Bad batch number (at least #1)");
+	}
 
 	std::ifstream ifs;
 	str_ent_set_map names;
@@ -2076,11 +2098,15 @@ bool RConicsIrcBotPlugin::whois(const message& msg)
 	db_rec r;
 
 	lower(query);
+	bug("H");
 
 //	if(is_guid(query, 2))
 	str guid = trim_copy(query, "(*)");
+	bug("I");
 	if(is_guid(guid, 3))
 	{
+		bug("J");
+
 		lock_guard lock(db_mtx);
 		ifs.open(bot.getf(RCONICS_DB_NAME, RCONICS_DB_NAME_DEFAULT));
 		str line;
@@ -3159,7 +3185,7 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 
 		static const str_vec adnums =
 		{
-			"00player", "03regular", "05admin", "02junior", "08senior", "04operator"
+			"01player", "03regular", "05admin", "02junior", "08senior", "04operator"
 		};
 
 		str admin = "<error>";
@@ -3212,7 +3238,7 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 		str slot = oa_to_IRC("^1[^7" + str(p.num<10?" ":"") + std::to_string(p.num) + "^1]^7 ");
 
 		soss oss;
-		oss << hud << IRC_COLOR << IRC_Olive << ip << " " << IRC_COLOR << IRC_White << guid;
+		oss << hud << IRC_COLOR << IRC_Olive << ip << " " << IRC_COLOR << IRC_Light_Gray << guid;
 		oss << " " << team << " " << IRC_COLOR << IRC_Royal_Blue << admin;
 		oss << " " << IRC_COLOR << IRC_White << score << slot << ping << oa_to_IRC(p.name);
 		bot.fc_reply(msg, oss.str());
@@ -3405,8 +3431,8 @@ bool RConicsIrcBotPlugin::initialize()
 		, "!rcon_exec <script name>."
 		, [&](const message& msg){ rcon_exec(msg); }
 	});
-	automsg_timer.set_maxdelay(10);
-	automsg_timer.set_mindelay(10);
+	automsg_timer.set_maxdelay(bot.get("rconics.managed.server.poll", 10));
+	automsg_timer.set_mindelay(bot.get("rconics.managed.server.poll", 10));
 	automsg_timer.on(0);
 	return true;
 }
