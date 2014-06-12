@@ -3121,7 +3121,7 @@ bool RConicsIrcBotPlugin::listplayers(const message& msg)
 	}
 
 	siz adv = 1;
-	for(str_vec_itr t = sort_types.begin(); t != sort_types.end(); t += adv)
+	for(str_vec_iter t = sort_types.begin(); t != sort_types.end(); t += adv)
 	{
 		if(t->size() < 2)
 			continue;
