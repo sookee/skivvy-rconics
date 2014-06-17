@@ -1170,6 +1170,9 @@ bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players
 	player p;
 	const rcon_server_map& sm = get_rcon_server_map();
 
+	if(sm.find(server) == sm.end())
+		return false;
+
 	// We have two data streams to parse in order to get one whole data item
 	// for each player. So we need to record if the first parsing succeeded
 	// before attempting the second.
@@ -3034,10 +3037,25 @@ bool RConicsIrcBotPlugin::rcon_short(const message& msg)
 	return rcon(m);
 }
 
+// !listplayers +notes <= crasher (map.at)
+
 bool RConicsIrcBotPlugin::listplayers(const message& msg)
 {
+	bug_func();
+	bug_var(msg.line);
+
 	str server, params;
 	sgl(siss(msg.get_user_params()) >> server, params);
+
+	bug_var(server);
+	bug_var(params);
+
+	const rcon_server_map& sm = get_rcon_server_map();
+	if(sm.find(server) == sm.end())
+	{
+		bot.fc_reply(msg, "Unknown server: " + server);
+		return false;
+	}
 
 	str mapname;
 	player_vec players;
