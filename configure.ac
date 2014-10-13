@@ -1,5 +1,5 @@
 # /*-----------------------------------------------------------------.
-# | Copyright (C) 2012 SooKee oasookee@gmail.com               |
+# | Copyright (C) 2012 SooKee oasookee@gmail.com                     |
 # '------------------------------------------------------------------'
 # 
 # This program is free software; you can redistribute it and/or
@@ -26,14 +26,15 @@ AC_CONFIG_SRCDIR([src/plugin-rconics.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 AM_INIT_AUTOMAKE([1.10 foreign])
-
+AM_SILENT_RULES
 AM_DISABLE_STATIC
 AM_PROG_LIBTOOL
+
 AC_PROG_CXX
 AC_PROG_INSTALL
 
 AC_LANG(C++)
-AC_MSG_CHECKING(if $CXX supports C++11)
+AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
 
 AC_CONFIG_MACRO_DIR([m4])
 
