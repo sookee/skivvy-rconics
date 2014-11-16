@@ -68,7 +68,7 @@ using namespace skivvy::irc;
 using namespace sookee::types;
 using namespace skivvy::utils;
 using namespace skivvy::ircbot;
-using namespace sookee::string;
+using namespace sookee::utils;
 
 const str K_ADMIN = "rconics.admin";
 const str USER = "rconics.user";
@@ -714,6 +714,8 @@ struct eng
 	time_t down;
 };
 
+USING_MAP(str, siz, str_siz_map);
+
 str RConicsIrcBotPlugin::get_isp(const str& ip)
 {
 	static std::mutex mtx;
@@ -952,7 +954,7 @@ void RConicsIrcBotPlugin::write_to_db(const str& db, const str& guid_in
 		ofs << r;
 	ifs.close();
 	r.guid = guid_in;
-	for(const str_siz_pair& s: items)
+	for(const auto& s: items)
 	{
 		r.count = s.second;
 		r.data = s.first;
