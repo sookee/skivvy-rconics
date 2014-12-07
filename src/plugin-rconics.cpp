@@ -3375,6 +3375,15 @@ bool RConicsIrcBotPlugin::initialize()
 	});
 	add
 	({
+		"!w"
+		, "!w (GUID|IP|name) [+ip] [+loc[=(code|country|state|city|zip|lat|long)]] [+isp] [#n]"
+			"\n	 Find other known aliases for player with GUID, IP or name."
+			"\n  Add optional IP (+ip) or location (+loc) or ISP (+isp) to the report."
+			"\n Location (+loc) can be augmented as +loc=<type> (code|country|state|zip|lat|long)"
+		, [&](const message& msg){ whois(msg); }
+	});
+	add
+	({
 		"!rcon"
 		, "!rcon <server> <cmd> Send rcon to server id <name> (only users specified in config)."
 		, [&](const message& msg){ rcon(msg); }
@@ -3383,6 +3392,12 @@ bool RConicsIrcBotPlugin::initialize()
 	({
 		"!listplayers"
 		, "!listplayers <server> ?(+b|+bots) ?(+n|+notes) ?(+p|+ping) ?(+score) ?(+ip) ?((+s|+sort) ('name'|''ip'|'score'|'team'|'ping'))"
+		, [&](const message& msg){ listplayers(msg); }//, "!listplayers"); }
+	});
+	add
+	({
+		"!lp"
+		, "!lp <server> ?(+b|+bots) ?(+n|+notes) ?(+p|+ping) ?(+score) ?(+ip) ?((+s|+sort) ('name'|''ip'|'score'|'team'|'ping'))"
 		, [&](const message& msg){ listplayers(msg); }//, "!listplayers"); }
 	});
 	add
