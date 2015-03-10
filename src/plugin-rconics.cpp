@@ -574,6 +574,21 @@ str adjust(const str& name)
 	return s;
 }
 
+// TODO: Consider this ip info engine 2015-03-08
+
+// ipinfo.io/81.101.111.32
+
+//{
+//  "ip": "8.8.8.8",
+//  "hostname": "google-public-dns-a.google.com",
+//  "city": "Mountain View",
+//  "region": "California",
+//  "country": "US",
+//  "loc": "37.3860,-122.0838",
+//  "org": "AS15169 Google Inc.",
+//  "postal": "94035"
+//}
+
 bool RConicsIrcBotPlugin::get_loc_map(const str& ip, location_map& m)
 {
 //	bug_func();
