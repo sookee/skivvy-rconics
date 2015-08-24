@@ -1133,7 +1133,7 @@ bool autoban_check(const str& server, const str& line, str& text)
 	if(now < stime || now > etime)
 		return false;
 
-	return ios::getstring(iss, text);
+	return (bool)ios::getstring(iss, text);
 }
 
 bool autotime_check(const str& server, const str& line, str& text, bool& active)
@@ -1179,7 +1179,7 @@ bool autounban_check(const str& server, const str& line, str& ban)
 	if(!(iss >> srv) || srv != server)
 		return false;
 
-	return ios::getstring(iss, ban);
+	return (bool)ios::getstring(iss, ban);
 }
 
 bool RConicsIrcBotPlugin::get_player_info(const str& server, player_vec& players, str& mapname, bool do_bots)
